@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-center text-4xl font-bold tracking-tight">
+      <h1 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
         Fleet Wise
       </h1>
       <p className="-mt-3 text-center text-sm font-medium uppercase tracking-widest text-[var(--text-muted)]">

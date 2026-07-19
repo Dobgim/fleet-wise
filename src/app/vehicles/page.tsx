@@ -85,8 +85,9 @@ export default function VehiclesPage() {
       .filter((r) => r.vehicleId === vehicleId)
       .reduce((s, r) => s + r.cost, 0);
 
+  // text-base on mobile stops iOS Safari from auto-zooming into inputs
   const input =
-    "rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700";
+    "rounded-md border border-neutral-300 bg-transparent px-3 py-1.5 text-base sm:text-sm outline-none focus:border-neutral-500 dark:border-neutral-700";
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6">

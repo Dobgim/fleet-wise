@@ -31,7 +31,7 @@ export default function LoginPage() {
   };
 
   const input =
-    "w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700";
+    "w-full rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-base sm:text-sm outline-none focus:border-neutral-500 dark:border-neutral-700";
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">

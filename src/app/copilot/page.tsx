@@ -177,7 +177,7 @@ export default function CopilotPage() {
               : "Ask about your fleet…"
           }
           disabled={quotaExhausted}
-          className="flex-1 rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-500 disabled:opacity-50 dark:border-neutral-700"
+          className="flex-1 rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-base sm:text-sm outline-none focus:border-neutral-500 disabled:opacity-50 dark:border-neutral-700"
         />
         <button
           type="submit"
