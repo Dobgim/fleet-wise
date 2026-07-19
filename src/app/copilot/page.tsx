@@ -101,7 +101,7 @@ export default function CopilotPage() {
   };
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col p-4 sm:p-6">
+    <main className="mx-auto flex h-[calc(100dvh-62px)] w-full max-w-3xl flex-col p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold tracking-tight">AI Copilot</h1>
         <Link
@@ -129,7 +129,7 @@ export default function CopilotPage() {
         </div>
       )}
 
-      <div className="mt-4 min-h-[55dvh] flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
+      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
         {messages.map((m, i) => (
           <div
             key={i}
