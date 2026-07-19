@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { friendlyAuthError } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -23,13 +24,20 @@ export default function SignupPage() {
     setBusy(true);
     setError("");
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: { data: { company_name: company.trim() } },
-    });
+    let data, error;
+    try {
+      ({ data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { company_name: company.trim() } },
+      }));
+    } catch (e) {
+      setError(friendlyAuthError(e instanceof Error ? e.message : "", "signup"));
+      setBusy(false);
+      return;
+    }
     if (error) {
-      setError(error.message);
+      setError(friendlyAuthError(error.message, "signup"));
       setBusy(false);
       return;
     }
@@ -119,9 +127,12 @@ export default function SignupPage() {
           />
         </div>
         {error && (
-          <p className="text-sm" style={{ color: "var(--status-critical)" }}>
+          <div
+            role="alert"
+            className="rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+          >
             {error}
-          </p>
+          </div>
         )}
         <button
           type="submit"
