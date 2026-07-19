@@ -129,7 +129,7 @@ export default function CopilotPage() {
         </div>
       )}
 
-      <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
+      <div className="mt-4 min-h-[55dvh] flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
         {messages.map((m, i) => (
           <div
             key={i}
@@ -155,17 +155,21 @@ export default function CopilotPage() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => send(s)}
-            className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-[var(--text-secondary)] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* Starter prompts: one swipeable row on mobile, wrapped on desktop;
+          hidden once the conversation is underway to give the chat room */}
+      {messages.length <= 1 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => send(s)}
+              className="shrink-0 rounded-full border border-neutral-300 px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form onSubmit={submit} className="mt-3 flex gap-2">
         <input
