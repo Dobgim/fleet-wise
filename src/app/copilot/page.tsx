@@ -102,22 +102,6 @@ export default function CopilotPage() {
 
   return (
     <main className="mx-auto flex h-[calc(100dvh-62px)] w-full max-w-3xl flex-col p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">AI Copilot</h1>
-        <Link
-          href="/pricing"
-          className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-[var(--text-secondary)] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-        >
-          {aiRemaining === null
-            ? `${PLANS[plan].name} plan · unlimited questions`
-            : `${PLANS[plan].name} plan · ${aiRemaining} question${aiRemaining === 1 ? "" : "s"} left this month`}
-        </Link>
-      </div>
-      <p className="mt-1 text-xs text-[var(--text-muted)]">
-        Answers are grounded in your fleet data. With an OpenAI key configured
-        the copilot uses the LLM; otherwise it falls back to built-in rules.
-      </p>
-
       {quotaExhausted && (
         <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
           You&apos;ve used all {PLANS[plan].aiQuestionsPerMonth} AI questions on
@@ -129,7 +113,7 @@ export default function CopilotPage() {
         </div>
       )}
 
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
         {messages.map((m, i) => (
           <div
             key={i}
