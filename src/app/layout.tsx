@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fleet Copilot",
+  title: "Fleet Wise",
   description:
-    "AI Fleet Maintenance Copilot — smarter maintenance decisions for your fleet.",
+    "Fleet Wise — AI-powered maintenance for your vehicles. Fewer breakdowns, lower costs.",
 };
 
 export default function RootLayout({

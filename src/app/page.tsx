@@ -4,8 +4,11 @@ export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
       <h1 className="text-center text-4xl font-bold tracking-tight">
-        AI Fleet Maintenance Copilot
+        Fleet Wise
       </h1>
+      <p className="-mt-3 text-center text-sm font-medium uppercase tracking-widest text-[var(--text-muted)]">
+        AI vehicle maintenance copilot
+      </p>
       <p className="max-w-md text-center text-[var(--text-secondary)]">
         Fewer breakdowns, lower costs, less time buried in records. For car
         owners with more than one vehicle and businesses with whole fleets —

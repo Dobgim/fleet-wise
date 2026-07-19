@@ -42,7 +42,7 @@ export default function LoginPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">Sign in</h1>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Welcome back to Fleet Copilot.
+            Welcome back to Fleet Wise.
           </p>
         </div>
         <div>

@@ -1,4 +1,4 @@
-# AI Fleet Maintenance Copilot
+# Fleet Wise — AI Fleet Maintenance Copilot
 
 B2B SaaS that helps fleet operators (delivery, taxi, logistics, construction,
 rental) make smarter maintenance decisions: vehicle + service-record tracking, a

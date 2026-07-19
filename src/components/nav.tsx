@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { PLANS } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
+import { Logo } from "./logo";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -20,8 +21,12 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-10 border-b border-neutral-200 bg-[var(--surface-1)] dark:border-neutral-800">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-        <Link href="/" className="text-sm font-bold tracking-tight">
-          🚚 Fleet Copilot
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-bold tracking-tight"
+        >
+          <Logo size={24} />
+          Fleet Wise
         </Link>
         {userEmail && (
           <nav className="flex gap-1 text-sm">
