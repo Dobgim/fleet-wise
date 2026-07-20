@@ -27,6 +27,8 @@ interface FleetContextValue {
   userEmail: string | null;
   orgId: string | null;
   orgName: string | null;
+  remindersEnabled: boolean;
+  setRemindersEnabled: (on: boolean) => void;
   vehicles: Vehicle[];
   records: ServiceRecord[];
   plan: PlanId;
@@ -92,6 +94,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
+  const [remindersEnabled, setRemindersState] = useState(true);
   const [plan, setPlanState] = useState<PlanId>("free");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
@@ -192,7 +195,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
       const { data: orgRow } = await supabase
         .from("organizations")
-        .select("id, name, plan")
+        .select("id, name, plan, reminders_enabled")
         .eq("id", org)
         .maybeSingle();
 
@@ -200,6 +203,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setOrgId(org);
       setOrgName(orgRow?.name ?? null);
       setPlanState((orgRow?.plan as PlanId) ?? "free");
+      setRemindersState(orgRow?.reminders_enabled ?? true);
       await Promise.all([fetchFleet(org), refreshAiUsage()]);
       if (!cancelled) setReady(true);
     })();
@@ -421,6 +425,24 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     })();
   }, [supabase, orgId, fetchFleet, fail]);
 
+  const setRemindersEnabled = useCallback(
+    (on: boolean) => {
+      if (!orgId) return;
+      setRemindersState(on);
+      void supabase
+        .from("organizations")
+        .update({ reminders_enabled: on })
+        .eq("id", orgId)
+        .then(({ error }) => {
+          if (error) {
+            setRemindersState(!on);
+            alert(`Could not change reminder setting: ${error.message}`);
+          }
+        });
+    },
+    [supabase, orgId]
+  );
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, [supabase]);
@@ -442,6 +464,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         userEmail: user?.email ?? null,
         orgId,
         orgName,
+        remindersEnabled,
+        setRemindersEnabled,
         vehicles,
         records,
         plan,

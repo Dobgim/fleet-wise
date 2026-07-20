@@ -38,7 +38,8 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
 }
 
 export default function DashboardPage() {
-  const { ready, vehicles, records } = useFleet();
+  const { ready, vehicles, records, remindersEnabled, setRemindersEnabled } =
+    useFleet();
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
@@ -53,7 +54,18 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6">
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={remindersEnabled}
+            onChange={(e) => setRemindersEnabled(e.target.checked)}
+            className="h-4 w-4 accent-neutral-900 dark:accent-white"
+          />
+          Email me maintenance reminders
+        </label>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile label="Vehicles" value={String(vehicles.length)} />
