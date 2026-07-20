@@ -350,10 +350,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     (next: PlanId) => {
       if (!orgId) return;
       setPlanState(next);
+      // Simulated checkout: the plan column is not writable by users, so this
+      // goes through a database function. Replaced by the payment provider's
+      // webhook when real billing lands.
       void supabase
-        .from("organizations")
-        .update({ plan: next })
-        .eq("id", orgId)
+        .rpc("set_plan_simulated", { p_plan: next })
         .then(({ error }) => {
           if (error) alert(`Could not change plan: ${error.message}`);
           else void refreshAiUsage(); // new plan, new allowance
