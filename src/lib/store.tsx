@@ -13,7 +13,13 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "./supabase/client";
 import { buildSeedData } from "./seed";
 import { PLANS } from "./plans";
-import type { AiUsage, PlanId, ServiceRecord, ServiceType, Vehicle } from "./types";
+import type {
+  AiBudget,
+  PlanId,
+  ServiceRecord,
+  ServiceType,
+  Vehicle,
+} from "./types";
 
 /**
  * Cloud data layer: vehicles, service records, the org's plan and the monthly
@@ -32,13 +38,13 @@ interface FleetContextValue {
   vehicles: Vehicle[];
   records: ServiceRecord[];
   plan: PlanId;
-  aiUsage: AiUsage;
-  aiRemaining: number | null;
+  /** Today's AI token budget, from the database. */
+  budget: AiBudget;
   canAddVehicle: boolean;
   setPlan: (plan: PlanId) => void;
-  /** Apply the authoritative remaining count returned by /api/copilot. */
-  applyAiQuota: (remaining: number | null) => void;
-  refreshAiUsage: () => Promise<void>;
+  /** Apply the authoritative budget returned by /api/copilot. */
+  applyBudget: (b: AiBudget) => void;
+  refreshBudget: () => Promise<void>;
   addVehicle: (v: Omit<Vehicle, "id" | "createdAt">) => void;
   updateVehicle: (id: string, patch: Partial<Omit<Vehicle, "id">>) => void;
   deleteVehicle: (id: string) => void;
@@ -56,10 +62,14 @@ function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-interface QuotaRow {
-  count: number;
-  limit: number | null;
-  remaining: number | null;
+function emptyBudget(limit = 0): AiBudget {
+  return {
+    limit,
+    used: 0,
+    remaining: limit,
+    requests: 0,
+    resets_at: "",
+  };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -98,11 +108,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const [plan, setPlanState] = useState<PlanId>("free");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
-  const [aiUsage, setAiUsage] = useState<AiUsage>({
-    month: currentMonth(),
-    count: 0,
-  });
-  const [aiRemainingState, setAiRemainingState] = useState<number | null>(null);
+  const [budget, setBudget] = useState<AiBudget>(emptyBudget());
 
   // Track the auth session
   useEffect(() => {
@@ -116,17 +122,14 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [supabase]);
 
-  const refreshAiUsage = useCallback(async () => {
-    const { data, error } = await supabase.rpc("get_ai_usage");
+  const refreshBudget = useCallback(async () => {
+    const { data, error } = await supabase.rpc("get_ai_budget");
     if (error || !data) return;
-    const q = data as unknown as QuotaRow;
-    setAiUsage({ month: currentMonth(), count: q.count ?? 0 });
-    setAiRemainingState(q.remaining ?? null);
+    setBudget(data as unknown as AiBudget);
   }, [supabase]);
 
-  const applyAiQuota = useCallback((remaining: number | null) => {
-    setAiRemainingState(remaining);
-    setAiUsage((u) => ({ month: currentMonth(), count: u.count + 1 }));
+  const applyBudget = useCallback((b: AiBudget) => {
+    if (b) setBudget(b);
   }, []);
 
   const fetchFleet = useCallback(
@@ -204,13 +207,13 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setOrgName(orgRow?.name ?? null);
       setPlanState((orgRow?.plan as PlanId) ?? "free");
       setRemindersState(orgRow?.reminders_enabled ?? true);
-      await Promise.all([fetchFleet(org), refreshAiUsage()]);
+      await Promise.all([fetchFleet(org), refreshBudget()]);
       if (!cancelled) setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [user, supabase, fetchFleet, refreshAiUsage]);
+  }, [user, supabase, fetchFleet, refreshBudget]);
 
   const fail = useCallback(
     (context: string, message: string, org: string | null) => {
@@ -361,10 +364,10 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         .rpc("set_plan_simulated", { p_plan: next })
         .then(({ error }) => {
           if (error) alert(`Could not change plan: ${error.message}`);
-          else void refreshAiUsage(); // new plan, new allowance
+          else void refreshBudget(); // new plan, new allowance
         });
     },
-    [supabase, orgId, refreshAiUsage]
+    [supabase, orgId, refreshBudget]
   );
 
 
@@ -448,12 +451,6 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   const planCfg = PLANS[plan];
-  // Server value wins; fall back to a local estimate until it arrives.
-  const aiRemaining =
-    planCfg.aiQuestionsPerMonth === null
-      ? null
-      : (aiRemainingState ??
-        Math.max(0, planCfg.aiQuestionsPerMonth - aiUsage.count));
   const canAddVehicle =
     planCfg.maxVehicles === null || vehicles.length < planCfg.maxVehicles;
 
@@ -469,12 +466,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         vehicles,
         records,
         plan,
-        aiUsage,
-        aiRemaining,
+        budget,
         canAddVehicle,
         setPlan,
-        applyAiQuota,
-        refreshAiUsage,
+        applyBudget,
+        refreshBudget,
         addVehicle,
         updateVehicle,
         deleteVehicle,

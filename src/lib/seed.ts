@@ -83,6 +83,5 @@ export function buildSeedData(): FleetData {
     vehicles,
     records,
     plan: "free",
-    aiUsage: { month: new Date().toISOString().slice(0, 7), count: 0 },
   };
 }

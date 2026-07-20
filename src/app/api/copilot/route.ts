@@ -32,6 +32,14 @@ interface RecordRow {
   notes: string | null;
 }
 
+interface Budget {
+  limit: number;
+  used: number;
+  remaining: number;
+  requests: number;
+  resets_at: string;
+}
+
 function buildContext(vehicles: VehicleRow[], records: RecordRow[]): string {
   const lines: string[] = [];
   for (const v of vehicles) {
@@ -72,29 +80,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  // Consume one question against the org's plan — authoritative, in Postgres.
-  const { data: quota, error: quotaError } = await supabase.rpc(
-    "consume_ai_question"
-  );
-  if (quotaError) {
-    console.error("quota rpc failed", quotaError.message);
+  // Pre-flight: does this org have enough of today's token budget left?
+  const { data: budgetData, error: budgetError } =
+    await supabase.rpc("check_ai_budget");
+  if (budgetError) {
+    console.error("budget rpc failed", budgetError.message);
     return NextResponse.json(
-      { error: "Could not verify your plan usage" },
+      { error: "Could not verify your token budget" },
       { status: 500 }
     );
   }
-  const q = quota as {
-    allowed: boolean;
-    count: number;
-    limit: number | null;
-    remaining: number | null;
-  };
-  if (!q.allowed) {
+  const budget = budgetData as Budget & { allowed: boolean };
+  if (!budget.allowed) {
     return NextResponse.json(
       {
         error: "quota_exceeded",
-        message: `You've used all ${q.limit} AI questions included in your plan this month. Upgrade to keep asking.`,
-        remaining: 0,
+        message: `You've used today's ${budget.limit.toLocaleString("en-US")} AI tokens. Your budget refills at midnight UTC — or upgrade for a bigger daily allowance.`,
+        budget,
       },
       { status: 402 }
     );
@@ -102,9 +104,10 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    // Client falls back to its local rules engine.
+    // Client falls back to its local rules engine. Nothing was spent, so the
+    // budget is returned untouched.
     return NextResponse.json(
-      { error: "OPENAI_API_KEY is not configured", remaining: q.remaining },
+      { error: "OPENAI_API_KEY is not configured", budget },
       { status: 503 }
     );
   }
@@ -125,6 +128,10 @@ export async function POST(request: Request) {
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const today = new Date().toISOString().slice(0, 10);
 
+  // Never let one reply overshoot the remaining budget by more than a little:
+  // cap the answer length to what is actually left (600 tokens at most).
+  const replyCap = Math.max(120, Math.min(600, budget.remaining - 200));
+
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -134,7 +141,7 @@ export async function POST(request: Request) {
     body: JSON.stringify({
       model,
       temperature: 0.3,
-      max_tokens: 600,
+      max_tokens: replyCap,
       messages: [
         { role: "system", content: SYSTEM_PROMPT.replace("{today}", today) },
         {
@@ -151,22 +158,45 @@ export async function POST(request: Request) {
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error("OpenAI error", res.status, detail.slice(0, 500));
+    // Failed calls are not charged to the user.
     return NextResponse.json(
-      { error: `LLM request failed (${res.status})`, remaining: q.remaining },
+      { error: `LLM request failed (${res.status})`, budget },
       { status: 502 }
     );
   }
 
   const json = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
   };
   const answer = json.choices?.[0]?.message?.content?.trim();
   if (!answer) {
     return NextResponse.json(
-      { error: "Empty LLM response", remaining: q.remaining },
+      { error: "Empty LLM response", budget },
       { status: 502 }
     );
   }
 
-  return NextResponse.json({ answer, model, remaining: q.remaining });
+  // Debit what the model actually consumed. The provider reports this on
+  // every response, which is why no training or estimation is involved.
+  const spent = json.usage?.total_tokens ?? 0;
+  const { data: updated, error: debitError } = await supabase.rpc(
+    "record_ai_tokens",
+    { p_tokens: spent }
+  );
+  if (debitError) {
+    // The answer is already paid for upstream; log loudly but still reply.
+    console.error("token debit failed", debitError.message, "tokens:", spent);
+  }
+
+  return NextResponse.json({
+    answer,
+    model,
+    spent,
+    budget: (updated as Budget) ?? budget,
+  });
 }

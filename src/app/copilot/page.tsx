@@ -3,8 +3,18 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { askCopilot } from "@/lib/copilot";
-import { PLANS } from "@/lib/plans";
+import { formatTokens, PLANS } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
+import type { AiBudget } from "@/lib/types";
+
+function resetsIn(iso: string): string {
+  if (!iso) return "midnight UTC";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return "shortly";
+  const hours = Math.floor(ms / 3_600_000);
+  const mins = Math.round((ms % 3_600_000) / 60_000);
+  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -24,7 +34,7 @@ const SUGGESTIONS = [
 ];
 
 export default function CopilotPage() {
-  const { ready, vehicles, records, plan, aiRemaining, applyAiQuota } =
+  const { ready, vehicles, records, plan, budget, applyBudget, refreshBudget } =
     useFleet();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -40,10 +50,16 @@ export default function CopilotPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
 
+  // Budget may have refilled (new UTC day) since the app loaded.
+  useEffect(() => {
+    void refreshBudget();
+  }, [refreshBudget]);
+
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
 
-  const quotaExhausted = aiRemaining !== null && aiRemaining <= 0;
+  // 600 tokens is the headroom the server requires to start a request.
+  const quotaExhausted = budget.limit > 0 && budget.remaining < 600;
 
   const send = async (question: string) => {
     const q = question.trim();
@@ -66,9 +82,10 @@ export default function CopilotPage() {
       const json = (await res.json().catch(() => ({}))) as {
         answer?: string;
         message?: string;
-        remaining?: number | null;
+        spent?: number;
+        budget?: AiBudget;
       };
-      if (json.remaining !== undefined) applyAiQuota(json.remaining ?? null);
+      if (json.budget) applyBudget(json.budget);
 
       if (res.status === 402) {
         // Quota spent — server refused, and it is the authority.
@@ -104,14 +121,36 @@ export default function CopilotPage() {
 
   return (
     <main className="mx-auto flex h-[calc(100dvh-62px)] w-full max-w-3xl flex-col p-4 sm:p-6">
+      {/* Token budget meter */}
+      {budget.limit > 0 && (
+        <div className="mb-3 flex items-center gap-3">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${Math.min(100, (budget.used / budget.limit) * 100)}%`,
+                background: quotaExhausted
+                  ? "var(--status-critical)"
+                  : "var(--chart-1, #3987e5)",
+              }}
+            />
+          </div>
+          <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+            {formatTokens(budget.remaining)} / {formatTokens(budget.limit)}{" "}
+            tokens left today
+          </span>
+        </div>
+      )}
+
       {quotaExhausted && (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-          You&apos;ve used all {PLANS[plan].aiQuestionsPerMonth} AI questions on
-          the {PLANS[plan].name} plan this month.{" "}
+        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+          You&apos;ve used today&apos;s {formatTokens(PLANS[plan].dailyTokens)}{" "}
+          AI tokens on the {PLANS[plan].name} plan. They refill in{" "}
+          <b>{resetsIn(budget.resets_at)}</b>, or{" "}
           <Link href="/pricing" className="font-semibold underline">
-            Upgrade to Premium ($20/mo) or Business ($100/mo)
-          </Link>{" "}
-          to keep asking.
+            upgrade for a bigger daily allowance
+          </Link>
+          .
         </div>
       )}
 

@@ -31,16 +31,20 @@ export interface ServiceRecord {
 
 export type PlanId = "free" | "pro" | "business";
 
-export interface AiUsage {
-  month: string; // YYYY-MM the counter applies to
-  count: number;
+/** Today's AI token budget for an organization, as reported by Postgres. */
+export interface AiBudget {
+  limit: number;
+  used: number;
+  remaining: number;
+  requests: number;
+  /** ISO timestamp of the next UTC midnight, when the budget refills. */
+  resets_at: string;
 }
 
 export interface FleetData {
   vehicles: Vehicle[];
   records: ServiceRecord[];
   plan: PlanId;
-  aiUsage: AiUsage;
 }
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {

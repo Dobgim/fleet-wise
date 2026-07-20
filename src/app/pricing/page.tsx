@@ -1,10 +1,10 @@
 "use client";
 
 import { useFleet } from "@/lib/store";
-import { PLANS, PLAN_ORDER } from "@/lib/plans";
+import { approxQuestions, formatTokens, PLANS, PLAN_ORDER } from "@/lib/plans";
 
 export default function PricingPage() {
-  const { ready, plan, aiUsage, aiRemaining, vehicles, setPlan } = useFleet();
+  const { ready, plan, budget, vehicles, setPlan } = useFleet();
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
@@ -20,9 +20,7 @@ export default function PricingPage() {
           plan · {vehicles.length}
           {current.maxVehicles !== null && ` / ${current.maxVehicles}`} vehicles
           ·{" "}
-          {aiRemaining === null
-            ? "unlimited AI questions"
-            : `${aiRemaining} AI questions left this month (${aiUsage.count} used)`}
+          {`${formatTokens(budget.remaining)} of ${formatTokens(budget.limit)} AI tokens left today`}
         </p>
         <p className="mt-1 text-xs text-[var(--text-muted)]">
           Local mode: switching plans is simulated so you can test the limits.
@@ -58,6 +56,9 @@ export default function PricingPage() {
               <p className="mt-4">
                 <span className="text-3xl font-bold">${p.pricePerMonth}</span>
                 <span className="text-sm text-[var(--text-muted)]">/month</span>
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                ≈ {approxQuestions(p.dailyTokens)} AI questions a day
               </p>
               <ul className="mt-4 flex-1 space-y-2 text-sm">
                 {p.features.map((f) => (
