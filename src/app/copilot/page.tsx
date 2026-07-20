@@ -24,7 +24,7 @@ const SUGGESTIONS = [
 ];
 
 export default function CopilotPage() {
-  const { ready, vehicles, records, plan, aiRemaining, recordAiQuestion } =
+  const { ready, vehicles, records, plan, aiRemaining, applyAiQuota } =
     useFleet();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -48,41 +48,43 @@ export default function CopilotPage() {
   const send = async (question: string) => {
     const q = question.trim();
     if (!q || thinking || quotaExhausted) return;
-    recordAiQuestion();
     setMessages((m) => [...m, { role: "user", text: q }]);
     setInput("");
     setThinking(true);
 
-    // Try the LLM endpoint first; fall back to the local rules engine when
-    // no API key is configured or the request fails.
+    // The server owns identity, quota and the fleet context — the browser
+    // only sends the question. Falls back to the local rules engine when the
+    // LLM is unavailable (no key, no credit, outage).
     let answer: string | null = null;
     let source: "llm" | "rules" = "llm";
     try {
       const res = await fetch("/api/copilot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: q,
-          vehicles: vehicles.map((v) => ({
-            id: v.id,
-            registration: v.registration,
-            make: v.make,
-            model: v.model,
-            mileage: v.mileage,
-          })),
-          records: records.map((r) => ({
-            vehicleId: r.vehicleId,
-            type: r.type,
-            cost: r.cost,
-            serviceDate: r.serviceDate,
-            notes: r.notes,
-          })),
-        }),
+        body: JSON.stringify({ question: q }),
       });
-      if (res.ok) {
-        const json = (await res.json()) as { answer?: string };
-        answer = json.answer ?? null;
+      const json = (await res.json().catch(() => ({}))) as {
+        answer?: string;
+        message?: string;
+        remaining?: number | null;
+      };
+      if (json.remaining !== undefined) applyAiQuota(json.remaining ?? null);
+
+      if (res.status === 402) {
+        // Quota spent — server refused, and it is the authority.
+        setMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            text:
+              json.message ??
+              "You've used all the AI questions included in your plan this month.",
+          },
+        ]);
+        setThinking(false);
+        return;
       }
+      if (res.ok) answer = json.answer ?? null;
     } catch {
       // network/server error — fall back below
     }
