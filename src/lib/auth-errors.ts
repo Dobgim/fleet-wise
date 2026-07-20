@@ -22,6 +22,10 @@ export function friendlyAuthError(
     return "That email address doesn't look valid. Check it for typos.";
   if (msg.includes("rate limit") || msg.includes("too many"))
     return "Too many attempts right now. Wait a few minutes, then try again.";
+  // Supabase returns this (HTTP 500) when its email sender refuses — almost
+  // always the hourly cap on the built-in service, which no retry will beat.
+  if (msg.includes("confirmation email") || msg.includes("sending email"))
+    return "We couldn't send your confirmation email — the email service has hit its hourly limit. Please try again in about an hour, or contact support if this keeps happening.";
   if (msg.includes("signups not allowed") || msg.includes("disabled"))
     return "Sign-ups are temporarily unavailable. Please try again later.";
   if (msg.includes("fetch") || msg.includes("network"))
