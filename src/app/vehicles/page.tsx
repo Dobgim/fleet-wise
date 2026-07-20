@@ -1,11 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { formatMoney } from "@/lib/insights";
 import { PLANS } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { Vehicle } from "@/lib/types";
+
+/** Downscale a photo in the browser before upload — smaller, cheaper, faster. */
+function fileToScaledDataUrl(file: File, maxDim = 1200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("no canvas"));
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that image."));
+    };
+    img.src = url;
+  });
+}
 
 const EMPTY = { registration: "", vin: "", make: "", model: "", mileage: "" };
 
@@ -21,10 +45,14 @@ export default function VehiclesPage() {
     deleteVehicle,
     resetDemoData,
     clearAllData,
+    applyBudget,
   } = useFleet();
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
@@ -80,6 +108,54 @@ export default function VehiclesPage() {
     setError("");
   };
 
+  const scanPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setError("");
+    setScanNote("");
+    setScanning(true);
+    try {
+      const image = await fileToScaledDataUrl(file);
+      const res = await fetch("/api/vehicle-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.budget) applyBudget(data.budget);
+      if (!res.ok) {
+        setError(
+          data.message ??
+            "Couldn't read that photo. Please fill the form in yourself."
+        );
+        return;
+      }
+      // Pre-fill only the fields the AI actually found; keep anything the user
+      // already typed for the rest.
+      setForm((f) => ({
+        registration: data.registration ?? f.registration,
+        vin: data.vin ?? f.vin,
+        make: data.make ?? f.make,
+        model: data.model ?? f.model,
+        mileage: data.mileage != null ? String(data.mileage) : f.mileage,
+      }));
+      const found = ["registration", "make", "model", "vin", "mileage"].filter(
+        (k) => data[k] != null && data[k] !== ""
+      );
+      setScanNote(
+        (data.notes ? data.notes + " " : "") +
+          (found.length
+            ? `Filled in: ${found.join(", ")}. Please check each field, then Add vehicle.`
+            : "I couldn't read any details — please fill the form in yourself.")
+      );
+    } catch {
+      setError("Couldn't process that image. Try a clearer, smaller photo.");
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const totalCost = (vehicleId: string) =>
     records
       .filter((r) => r.vehicleId === vehicleId)
@@ -131,9 +207,47 @@ export default function VehiclesPage() {
         onSubmit={submit}
         className="rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800"
       >
-        <h2 className="mb-3 text-sm font-semibold">
-          {editingId ? "Edit vehicle" : "Add vehicle"}
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            {editingId ? "Edit vehicle" : "Add vehicle"}
+          </h2>
+          {!editingId && (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={scanning}
+              className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              style={{ borderColor: "var(--brand)", color: "var(--brand)" }}
+            >
+              <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true" fill="none">
+                <path d="M3 7a2 2 0 012-2h1.2l.8-1.4A1 1 0 018 3h4a1 1 0 01.9.6L13.8 5H15a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.5"/>
+                <circle cx="10" cy="10.5" r="2.6" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+              {scanning ? "Reading photo…" : "Scan a photo instead"}
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={scanPhoto}
+            className="hidden"
+          />
+        </div>
+
+        {scanNote && (
+          <div
+            className="mb-3 rounded-lg border px-3 py-2.5 text-sm"
+            style={{
+              borderColor: "var(--brand)",
+              background: "var(--brand-soft)",
+            }}
+          >
+            {scanNote}
+          </div>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-5">
           <div>
             <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
