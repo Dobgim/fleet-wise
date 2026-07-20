@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { MonthlyCostChart, TopVehiclesChart } from "@/components/charts";
 import {
   detectAnomalies,
@@ -40,6 +41,28 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
 export default function DashboardPage() {
   const { ready, vehicles, records, remindersEnabled, setRemindersEnabled } =
     useFleet();
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState("");
+
+  const sendTestReminder = async () => {
+    setTesting(true);
+    setTestMsg("");
+    try {
+      const res = await fetch("/api/reminders/test", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok) {
+        setTestMsg(
+          `Sent! Check ${data.sentTo} (and your spam folder) for a reminder about ${data.itemCount} item${data.itemCount === 1 ? "" : "s"}.`
+        );
+      } else {
+        setTestMsg(data.message ?? data.error ?? "Couldn't send the reminder.");
+      }
+    } catch {
+      setTestMsg("Couldn't reach the server. Try again.");
+    } finally {
+      setTesting(false);
+    }
+  };
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
@@ -56,16 +79,35 @@ export default function DashboardPage() {
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={remindersEnabled}
-            onChange={(e) => setRemindersEnabled(e.target.checked)}
-            className="h-4 w-4 accent-neutral-900 dark:accent-white"
-          />
-          Email me maintenance reminders
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <input
+              type="checkbox"
+              checked={remindersEnabled}
+              onChange={(e) => setRemindersEnabled(e.target.checked)}
+              className="h-4 w-4 accent-neutral-900 dark:accent-white"
+            />
+            Email me maintenance reminders
+          </label>
+          <button
+            onClick={sendTestReminder}
+            disabled={testing}
+            className="rounded-full border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            style={{ borderColor: "var(--brand)", color: "var(--brand)" }}
+          >
+            {testing ? "Sending…" : "Email me a test reminder"}
+          </button>
+        </div>
       </div>
+
+      {testMsg && (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{ borderColor: "var(--brand)", background: "var(--brand-soft)" }}
+        >
+          {testMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile label="Vehicles" value={String(vehicles.length)} />
