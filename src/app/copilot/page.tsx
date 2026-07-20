@@ -121,27 +121,6 @@ export default function CopilotPage() {
 
   return (
     <main className="mx-auto flex h-[calc(100dvh-62px)] w-full max-w-3xl flex-col p-4 sm:p-6">
-      {/* Token budget meter */}
-      {budget.limit > 0 && (
-        <div className="mb-3 flex items-center gap-3">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${Math.min(100, (budget.used / budget.limit) * 100)}%`,
-                background: quotaExhausted
-                  ? "var(--status-critical)"
-                  : "var(--chart-1, #3987e5)",
-              }}
-            />
-          </div>
-          <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
-            {formatTokens(budget.remaining)} / {formatTokens(budget.limit)}{" "}
-            tokens left today
-          </span>
-        </div>
-      )}
-
       {quotaExhausted && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
           You&apos;ve used today&apos;s {formatTokens(PLANS[plan].dailyTokens)}{" "}
@@ -154,41 +133,44 @@ export default function CopilotPage() {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`max-w-[85%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-sm ${
-              m.role === "user"
-                ? "ml-auto bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                : "bg-neutral-100 dark:bg-neutral-800"
-            }`}
-          >
-            {m.text}
-            {m.source && (
-              <span className="mt-1.5 block text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                {m.source === "llm" ? "AI answer" : "Offline answer (rules)"}
-              </span>
-            )}
-          </div>
-        ))}
+      {/* Conversation — no container, messages sit on the page like ChatGPT */}
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
+        {messages.map((m, i) =>
+          m.role === "user" ? (
+            <div key={i} className="flex justify-end">
+              <div className="max-w-[80%] whitespace-pre-wrap rounded-3xl bg-neutral-100 px-4 py-2.5 text-[15px] leading-relaxed dark:bg-neutral-800">
+                {m.text}
+              </div>
+            </div>
+          ) : (
+            <div key={i} className="whitespace-pre-wrap text-[15px] leading-relaxed">
+              {m.text}
+              {m.source === "rules" && (
+                <span className="mt-1.5 block text-[11px] text-[var(--text-muted)]">
+                  Offline answer — the AI is unreachable right now
+                </span>
+              )}
+            </div>
+          )
+        )}
         {thinking && (
-          <div className="w-fit rounded-xl bg-neutral-100 px-3.5 py-2.5 text-sm text-[var(--text-muted)] dark:bg-neutral-800">
-            Thinking…
+          <div className="flex gap-1.5 py-1" aria-label="Thinking">
+            <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.3s]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.15s]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400" />
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Starter prompts: one swipeable row on mobile, wrapped on desktop;
-          hidden once the conversation is underway to give the chat room */}
+      {/* Starter prompts, only before the conversation begins */}
       {messages.length <= 1 && (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
               onClick={() => send(s)}
-              className="shrink-0 rounded-full border border-neutral-300 px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              className="shrink-0 rounded-full border border-neutral-200 px-3.5 py-2 text-[13px] text-[var(--text-secondary)] transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             >
               {s}
             </button>
@@ -196,26 +178,45 @@ export default function CopilotPage() {
         </div>
       )}
 
-      <form onSubmit={submit} className="mt-3 flex gap-2">
+      {/* Composer — single rounded pill with the send arrow inside */}
+      <form
+        onSubmit={submit}
+        className="flex items-end gap-2 rounded-[26px] border border-neutral-200 bg-[var(--surface-1)] px-4 py-2.5 shadow-sm focus-within:border-neutral-400 dark:border-neutral-700 dark:focus-within:border-neutral-500"
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
-            quotaExhausted
-              ? "Monthly AI limit reached — upgrade to continue"
-              : "Ask about your fleet…"
+            quotaExhausted ? "Daily tokens used up" : "Ask anything"
           }
           disabled={quotaExhausted}
-          className="flex-1 rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-base sm:text-sm outline-none focus:border-neutral-500 disabled:opacity-50 dark:border-neutral-700"
+          className="min-w-0 flex-1 border-0 bg-transparent py-1.5 text-base outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50 sm:text-[15px]"
         />
         <button
           type="submit"
+          aria-label="Send message"
           disabled={thinking || !input.trim() || quotaExhausted}
-          className="rounded-md bg-neutral-900 px-5 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-opacity disabled:opacity-25 dark:bg-white dark:text-neutral-900"
         >
-          Send
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
         </button>
       </form>
+
+      {budget.limit > 0 && (
+        <p className="pt-2 text-center text-[11px] text-[var(--text-muted)]">
+          {formatTokens(budget.remaining)} of {formatTokens(budget.limit)} daily
+          AI tokens left · refills in {resetsIn(budget.resets_at)}
+        </p>
+      )}
     </main>
   );
 }
