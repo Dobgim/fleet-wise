@@ -1,15 +1,95 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFleet } from "@/lib/store";
 import { approxQuestions, formatTokens, PLANS, PLAN_ORDER } from "@/lib/plans";
+import type { PlanId } from "@/lib/types";
+
+const BILLING_LIVE = process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true";
 
 export default function PricingPage() {
+  return (
+    <Suspense
+      fallback={<p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>}
+    >
+      <Pricing />
+    </Suspense>
+  );
+}
+
+function Pricing() {
   const { ready, plan, budget, vehicles, setPlan } = useFleet();
+  const router = useRouter();
+  const params = useSearchParams();
+  const [busy, setBusy] = useState<PlanId | "portal" | null>(null);
+  const [notice, setNotice] = useState("");
+
+  // Banner after returning from Stripe Checkout.
+  useEffect(() => {
+    const c = params.get("checkout");
+    if (c === "success")
+      setNotice(
+        "Payment received — thank you! Your new plan will be active within a few seconds."
+      );
+    else if (c === "cancelled")
+      setNotice("Checkout cancelled — no charge was made.");
+    if (c) router.replace("/pricing");
+  }, [params, router]);
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
 
   const current = PLANS[plan];
+
+  const choosePlan = async (id: PlanId) => {
+    setNotice("");
+    // Free = downgrade; paid = Stripe Checkout (or simulated before keys exist)
+    if (!BILLING_LIVE) {
+      setPlan(id);
+      return;
+    }
+    if (id === "free") {
+      // Cancelling a paid plan is done in the billing portal.
+      return openPortal();
+    }
+    setBusy(id);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setNotice(data.error ?? "Couldn't start checkout. Please try again.");
+    } catch {
+      setNotice("Couldn't reach the payment service. Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openPortal = async () => {
+    setBusy("portal");
+    setNotice("");
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setNotice(data.error ?? "Couldn't open billing. Please try again.");
+    } catch {
+      setNotice("Couldn't reach the payment service. Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 p-4 sm:p-6">
@@ -22,12 +102,33 @@ export default function PricingPage() {
           ·{" "}
           {`${formatTokens(budget.remaining)} of ${formatTokens(budget.limit)} AI tokens left today`}
         </p>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">
-          Local mode: switching plans is simulated so you can test the limits.
-          Real card payments (Stripe) are wired in when the backend is
-          connected.
-        </p>
+        {!BILLING_LIVE && (
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Test mode: switching plans is simulated. Real card payments turn on
+            once Stripe is connected.
+          </p>
+        )}
       </div>
+
+      {notice && (
+        <div
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{ borderColor: "var(--brand)", background: "var(--brand-soft)" }}
+        >
+          {notice}
+        </div>
+      )}
+
+      {BILLING_LIVE && plan !== "free" && (
+        <button
+          onClick={openPortal}
+          disabled={busy === "portal"}
+          className="text-sm font-medium underline underline-offset-2 disabled:opacity-50"
+          style={{ color: "var(--brand)" }}
+        >
+          {busy === "portal" ? "Opening…" : "Manage billing, update card, or cancel"}
+        </button>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         {PLAN_ORDER.map((id) => {
@@ -68,8 +169,8 @@ export default function PricingPage() {
                 ))}
               </ul>
               <button
-                disabled={isCurrent}
-                onClick={() => setPlan(id)}
+                disabled={isCurrent || busy === id}
+                onClick={() => choosePlan(id)}
                 className={`mt-5 rounded-md px-4 py-2 text-sm font-medium ${
                   isCurrent
                     ? "cursor-default border border-neutral-300 text-[var(--text-muted)] dark:border-neutral-700"
@@ -78,9 +179,13 @@ export default function PricingPage() {
               >
                 {isCurrent
                   ? "Your plan"
-                  : p.pricePerMonth === 0
-                    ? "Downgrade to Free"
-                    : `Subscribe — $${p.pricePerMonth}/mo`}
+                  : busy === id
+                    ? "Starting…"
+                    : p.pricePerMonth === 0
+                      ? BILLING_LIVE
+                        ? "Cancel to Free"
+                        : "Downgrade to Free"
+                      : `Subscribe — $${p.pricePerMonth}/mo`}
               </button>
             </section>
           );
