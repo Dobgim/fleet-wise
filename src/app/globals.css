@@ -15,6 +15,14 @@
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
+
+  /* Brand — taken from the logo's blue-to-violet gradient.
+     --brand is the accent; --brand-ink is text placed on top of it. */
+  --brand: #2f6fd0;
+  --brand-hover: #2a5fb4;
+  --brand-soft: #e8f0fc;
+  --brand-ink: #ffffff;
+  --brand-gradient: linear-gradient(135deg, #3987e5 0%, #4a3aa7 100%);
 }
 
 @theme inline {
@@ -35,6 +43,12 @@
     --gridline: #2c2c2a;
     --baseline: #383835;
     --series-1: #3987e5;
+
+    /* Lifted for contrast against the dark background */
+    --brand: #4b8ff0;
+    --brand-hover: #6ba3f5;
+    --brand-soft: #16233a;
+    --brand-ink: #0b0b0b;
   }
 }
 
@@ -42,4 +56,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Primary action in the brand colour — used for every main call to action
+   so the app reads as Fleet Wise rather than generic black-and-white. */
+.btn-brand {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+.btn-brand:hover:not(:disabled) {
+  background: var(--brand-hover);
 }

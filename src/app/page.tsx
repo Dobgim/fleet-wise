@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Logo, Wordmark } from "@/components/logo";
 
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
-        Fleet Wise
+      <Logo size={64} />
+      <h1 className="-mt-2 text-center text-3xl font-bold tracking-tight sm:text-4xl">
+        <Wordmark />
       </h1>
       <p className="-mt-3 text-center text-sm font-medium uppercase tracking-widest text-[var(--text-muted)]">
         AI vehicle maintenance copilot
@@ -18,7 +20,7 @@ export default function Home() {
       <div className="flex gap-4">
         <Link
           href="/signup"
-          className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          className="rounded-lg btn-brand px-5 py-2.5 text-sm font-medium"
         >
           Get started free
         </Link>

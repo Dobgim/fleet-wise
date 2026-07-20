@@ -36,16 +36,15 @@ export default function PricingPage() {
           return (
             <section
               key={id}
+              style={isCurrent ? { borderColor: "var(--brand)" } : undefined}
               className={`flex flex-col rounded-xl border bg-[var(--surface-1)] p-5 ${
-                isCurrent
-                  ? "border-2 border-neutral-900 dark:border-white"
-                  : "border-neutral-200 dark:border-neutral-800"
+                isCurrent ? "border-2" : "border-neutral-200 dark:border-neutral-800"
               }`}
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">{p.name}</h2>
                 {isCurrent && (
-                  <span className="rounded-full bg-neutral-900 px-2.5 py-0.5 text-xs font-medium text-white dark:bg-white dark:text-neutral-900">
+                  <span className="btn-brand rounded-full px-2.5 py-0.5 text-xs font-medium">
                     Current plan
                   </span>
                 )}
@@ -74,7 +73,7 @@ export default function PricingPage() {
                 className={`mt-5 rounded-md px-4 py-2 text-sm font-medium ${
                   isCurrent
                     ? "cursor-default border border-neutral-300 text-[var(--text-muted)] dark:border-neutral-700"
-                    : "bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+                    : "btn-brand"
                 }`}
               >
                 {isCurrent

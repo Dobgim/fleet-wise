@@ -138,7 +138,13 @@ export default function CopilotPage() {
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={i} className="flex justify-end">
-              <div className="max-w-[80%] whitespace-pre-wrap rounded-3xl bg-neutral-100 px-4 py-2.5 text-[15px] leading-relaxed dark:bg-neutral-800">
+              <div
+                className="max-w-[80%] whitespace-pre-wrap rounded-3xl px-4 py-2.5 text-[15px] leading-relaxed"
+                style={{
+                  background: "var(--brand)",
+                  color: "var(--brand-ink)",
+                }}
+              >
                 {m.text}
               </div>
             </div>
@@ -196,7 +202,8 @@ export default function CopilotPage() {
           type="submit"
           aria-label="Send message"
           disabled={thinking || !input.trim() || quotaExhausted}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-opacity disabled:opacity-25 dark:bg-white dark:text-neutral-900"
+          style={{ background: "var(--brand)", color: "var(--brand-ink)" }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <path

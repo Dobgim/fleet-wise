@@ -231,7 +231,7 @@ export default function VehicleDetailPage() {
         <div className="mt-3 flex gap-2">
           <button
             type="submit"
-            className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+            className="rounded-md btn-brand px-4 py-1.5 text-sm font-medium"
           >
             {editingId ? "Save changes" : "Add record"}
           </button>

@@ -1,3 +1,12 @@
+/** The wordmark: "Fleet" in the page's text colour, "Wise" in brand blue. */
+export function Wordmark({ className = "" }: { className?: string }) {
+  return (
+    <span className={className}>
+      Fleet<span style={{ color: "var(--brand)" }}>Wise</span>
+    </span>
+  );
+}
+
 export function Logo({ size = 24 }: { size?: number }) {
   return (
     <svg

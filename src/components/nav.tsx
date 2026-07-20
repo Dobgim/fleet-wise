@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PLANS } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
-import { Logo } from "./logo";
+import { Logo, Wordmark } from "./logo";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -60,7 +60,7 @@ export function Nav() {
           href="/"
           className="absolute left-1/2 -translate-x-1/2 text-base font-bold tracking-tight"
         >
-          Fleet Wise
+          <Wordmark />
         </Link>
 
         {userEmail ? (
@@ -73,7 +73,7 @@ export function Nav() {
         ) : (
           <Link
             href="/login"
-            className="rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
+            className="rounded-full btn-brand px-4 py-2 text-sm font-medium"
           >
             Log in
           </Link>
@@ -87,7 +87,7 @@ export function Nav() {
           className="flex items-center gap-2 text-sm font-bold tracking-tight"
         >
           <Logo size={24} />
-          Fleet Wise
+          <Wordmark />
         </Link>
         {userEmail && (
           <nav className="flex gap-1 text-sm">
@@ -97,9 +97,14 @@ export function Nav() {
                 <Link
                   key={l.href}
                   href={l.href}
+                  style={
+                    active
+                      ? { background: "var(--brand)", color: "var(--brand-ink)" }
+                      : undefined
+                  }
                   className={`rounded-md px-3 py-1.5 ${
                     active
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                      ? "font-medium"
                       : "text-[var(--text-secondary)] hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   }`}
                 >
@@ -141,7 +146,7 @@ export function Nav() {
               </Link>
               <Link
                 href="/signup"
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+                className="rounded-md btn-brand px-3 py-1.5 text-sm font-medium"
               >
                 Get started
               </Link>
@@ -162,7 +167,7 @@ export function Nav() {
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-lg font-bold tracking-tight">
                 <Logo size={28} />
-                Fleet Wise
+                <Wordmark />
               </span>
               <button
                 onClick={() => setOpen(false)}
@@ -190,10 +195,16 @@ export function Nav() {
                   <Link
                     key={l.href}
                     href={l.href}
-                    className={`rounded-lg px-3 py-3 text-base ${
+                    style={
                       active
-                        ? "bg-neutral-100 font-semibold dark:bg-neutral-800"
-                        : "text-[var(--text-secondary)]"
+                        ? {
+                            background: "var(--brand-soft)",
+                            color: "var(--brand)",
+                          }
+                        : undefined
+                    }
+                    className={`rounded-lg px-3 py-3 text-base ${
+                      active ? "font-semibold" : "text-[var(--text-secondary)]"
                     }`}
                   >
                     {l.label}
@@ -220,7 +231,7 @@ export function Nav() {
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="flex-1 rounded-lg bg-neutral-900 px-3 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
+                      className="flex-1 rounded-lg btn-brand px-3 py-2.5 text-sm font-medium"
                     >
                       Sign out
                     </button>
@@ -229,7 +240,7 @@ export function Nav() {
               ) : (
                 <Link
                   href="/signup"
-                  className="block rounded-lg bg-neutral-900 px-3 py-2.5 text-center text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
+                  className="btn-brand block rounded-lg px-3 py-2.5 text-center text-sm font-medium"
                 >
                   Get started free
                 </Link>
