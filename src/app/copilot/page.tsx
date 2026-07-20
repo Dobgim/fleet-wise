@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { askCopilot } from "@/lib/copilot";
 import { formatTokens, PLANS } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
-import type { AiBudget } from "@/lib/types";
+import type { AiBudget, ServiceRecord, Vehicle } from "@/lib/types";
 
 function resetsIn(iso: string): string {
   if (!iso) return "midnight UTC";
@@ -22,29 +22,70 @@ interface Message {
   source?: "llm" | "rules";
 }
 
-const SUGGESTIONS = [
-  "Which vehicles need servicing this month?",
-  "Which vehicles cost the most?",
-  "Which vehicles are becoming unreliable?",
-  "Predict the next oil change for VAN-101",
-  "Explain TRK-012's history",
-  "Summarize last month",
-  "Find duplicate repairs",
-  "Suggest preventive maintenance",
-];
+/**
+ * Starter prompts built from the user's own fleet — a prompt naming a
+ * vehicle they do not own is worse than no prompt at all.
+ */
+function buildSuggestions(
+  vehicles: Vehicle[],
+  records: ServiceRecord[]
+): string[] {
+  if (vehicles.length === 0) {
+    return [
+      "What can you help me with?",
+      "What should I track for my vehicles?",
+      "How do you decide when a service is due?",
+    ];
+  }
+
+  // Prefer the vehicle whose oil change is oldest — the likeliest to be due.
+  const lastOil = new Map<string, string>();
+  for (const r of records) {
+    if (r.type !== "oil") continue;
+    const prev = lastOil.get(r.vehicleId);
+    if (!prev || r.serviceDate > prev) lastOil.set(r.vehicleId, r.serviceDate);
+  }
+  const byOilAge = [...vehicles].sort((a, b) =>
+    (lastOil.get(a.id) ?? "0000-00-00").localeCompare(
+      lastOil.get(b.id) ?? "0000-00-00"
+    )
+  );
+  const primary = byOilAge[0];
+  const secondary =
+    vehicles.find((v) => v.id !== primary.id) ?? primary;
+
+  const out: string[] = [];
+  out.push(
+    vehicles.length > 1
+      ? "Which vehicles need servicing soon?"
+      : `Does ${primary.registration} need servicing soon?`
+  );
+  out.push(`Predict the next oil change for ${primary.registration}`);
+  if (records.length > 0) {
+    out.push(
+      vehicles.length > 1
+        ? "Which vehicle costs me the most?"
+        : `How much have I spent on ${primary.registration}?`
+    );
+    out.push(`Explain ${secondary.registration}'s service history`);
+  }
+  if (vehicles.length > 1) out.push("Which vehicles are becoming unreliable?");
+  if (records.length > 2) out.push("Find repairs that look duplicated");
+  out.push("Suggest preventive maintenance");
+  return out;
+}
 
 export default function CopilotPage() {
   const { ready, vehicles, records, plan, budget, applyBudget, refreshBudget } =
     useFleet();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      text: "Hi! I'm your fleet copilot. Ask me about servicing due, costs, reliability, or any vehicle by its registration.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const suggestions = useMemo(
+    () => buildSuggestions(vehicles, records),
+    [vehicles, records]
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -135,6 +176,20 @@ export default function CopilotPage() {
 
       {/* Conversation — no container, messages sit on the page like ChatGPT */}
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
+        {messages.length === 0 && (
+          <div className="flex h-full flex-col items-center justify-center px-4 text-center">
+            <h2 className="text-xl font-semibold sm:text-2xl">
+              {vehicles.length === 0
+                ? "Add a vehicle to get started"
+                : "What would you like to know?"}
+            </h2>
+            <p className="mt-2 max-w-sm text-sm text-[var(--text-secondary)]">
+              {vehicles.length === 0
+                ? "Once you add a vehicle and log its services, I can tell you what's due, what it costs you, and which repairs look suspicious."
+                : `Ask me anything about your ${vehicles.length} vehicle${vehicles.length === 1 ? "" : "s"} — servicing, costs, or reliability.`}
+            </p>
+          </div>
+        )}
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={i} className="flex justify-end">
@@ -170,9 +225,9 @@ export default function CopilotPage() {
       </div>
 
       {/* Starter prompts, only before the conversation begins */}
-      {messages.length <= 1 && (
+      {messages.length === 0 && (
         <div className="mb-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <button
               key={s}
               onClick={() => send(s)}
