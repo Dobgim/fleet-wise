@@ -61,7 +61,7 @@ export function buildReminderEmail(params: {
     overdue.length
       ? `<b style="color:#8a1f1f;">${overdue.length} overdue</b>`
       : "",
-    upcoming.length ? `${upcoming.length} due within 30 days` : "",
+    upcoming.length ? `${upcoming.length} due within the next week` : "",
   ]
     .filter(Boolean)
     .join(" · ");

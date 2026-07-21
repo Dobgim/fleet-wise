@@ -103,8 +103,13 @@ export async function GET(request: Request) {
       createdAt: r.created_at,
     }));
 
-    const items = getMaintenanceItems(vehicles, records);
-    if (items.length === 0) {
+    // The reminder policy: one email when a service comes within 7 days of
+    // its predicted date, one more if it tips into overdue. The dashboard
+    // keeps its wider 30-day view; email is deliberately less chatty.
+    const candidates = getMaintenanceItems(vehicles, records)
+      .filter((it) => it.status === "overdue" || it.daysDiff <= 7)
+      .map((it) => ({ item: it, stage: it.status }));
+    if (candidates.length === 0) {
       summary.skippedNothingDue++;
       continue;
     }
@@ -131,22 +136,48 @@ export async function GET(request: Request) {
       continue;
     }
 
-    // Claim today's send first: the unique (org_id, sent_on) index makes this
-    // the lock. If the insert conflicts, someone already sent today.
-    const { error: logErr } = await supabase.from("reminder_log").insert({
+    // Exactly-once per predicted service: claim rows in reminder_item_log
+    // first. The unique (vehicle, type, due_date, stage) index means an item
+    // already claimed — today or any earlier day — inserts nothing, so it can
+    // never be emailed twice.
+    const claims = candidates.map(({ item, stage }) => ({
       org_id: org.id,
-      sent_on: today,
-      item_count: items.length,
+      vehicle_id: item.vehicle.id,
+      service_type: item.type,
+      due_date: item.dueDate,
+      stage,
       recipient,
-    });
-    if (logErr) {
+    }));
+    const { data: claimed, error: claimErr } = await supabase
+      .from("reminder_item_log")
+      .upsert(claims, {
+        onConflict: "vehicle_id,service_type,due_date,stage",
+        ignoreDuplicates: true,
+      })
+      .select("vehicle_id, service_type, due_date, stage");
+
+    if (claimErr) {
+      summary.failed.push(`${org.name}: claim failed — ${claimErr.message}`);
+      continue;
+    }
+    if (!claimed || claimed.length === 0) {
       summary.skippedAlreadySent++;
       continue;
     }
 
+    // Email only the items whose claim WE won this run.
+    const won = new Set(
+      claimed.map((c) => `${c.vehicle_id}:${c.service_type}:${c.due_date}:${c.stage}`)
+    );
+    const toSend = candidates
+      .filter(({ item, stage }) =>
+        won.has(`${item.vehicle.id}:${item.type}:${item.dueDate}:${stage}`)
+      )
+      .map(({ item }) => item);
+
     const { subject, html } = buildReminderEmail({
       garageName: org.name,
-      items,
+      items: toSend,
       siteUrl,
       logoUrl,
     });
@@ -156,12 +187,16 @@ export async function GET(request: Request) {
       summary.sent++;
     } else {
       summary.failed.push(`${org.name}: ${result.error}`);
-      // Release the claim so tomorrow's run (or a manual retry) can try again.
-      await supabase
-        .from("reminder_log")
-        .delete()
-        .eq("org_id", org.id)
-        .eq("sent_on", today);
+      // Release only our claims so the next run retries them.
+      for (const c of claimed) {
+        await supabase
+          .from("reminder_item_log")
+          .delete()
+          .eq("vehicle_id", c.vehicle_id)
+          .eq("service_type", c.service_type)
+          .eq("due_date", c.due_date)
+          .eq("stage", c.stage);
+      }
     }
   }
 
