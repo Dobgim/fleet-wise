@@ -386,6 +386,13 @@ export default function VehiclesPage() {
                   {formatMoney(totalCost(v.id))}
                 </td>
                 <td className="px-4 py-2.5 text-right">
+                  <Link
+                    href={`/vehicles/${v.id}`}
+                    className="mr-3 text-xs font-medium underline-offset-2 hover:underline"
+                    style={{ color: "var(--brand)" }}
+                  >
+                    Log service
+                  </Link>
                   <button
                     onClick={() => startEdit(v)}
                     className="mr-3 text-xs underline-offset-2 hover:underline"
