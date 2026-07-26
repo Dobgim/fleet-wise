@@ -9,12 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@paddle/paddle-node-sdk": "^3.8.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "stripe": "^22.3.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

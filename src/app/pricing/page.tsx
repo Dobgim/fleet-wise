@@ -4,9 +4,18 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFleet } from "@/lib/store";
 import { approxQuestions, formatTokens, PLANS, PLAN_ORDER } from "@/lib/plans";
+import { openPaddleCheckout, paddleEnabled } from "@/lib/paddle-client";
 import type { PlanId } from "@/lib/types";
 
-const BILLING_LIVE = process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true";
+const PADDLE_PRICE: Record<string, string | undefined> = {
+  pro: process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO,
+  business: process.env.NEXT_PUBLIC_PADDLE_PRICE_BUSINESS,
+};
+
+// Real checkout only once a client token and both price ids exist; until
+// then the page keeps the simulated plan switch so limits stay testable.
+const BILLING_LIVE =
+  paddleEnabled() && Boolean(PADDLE_PRICE.pro && PADDLE_PRICE.business);
 
 export default function PricingPage() {
   return (
@@ -19,7 +28,8 @@ export default function PricingPage() {
 }
 
 function Pricing() {
-  const { ready, plan, budget, vehicles, setPlan } = useFleet();
+  const { ready, plan, budget, vehicles, setPlan, orgId, userEmail } =
+    useFleet();
   const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState<PlanId | "portal" | null>(null);
@@ -44,48 +54,36 @@ function Pricing() {
 
   const choosePlan = async (id: PlanId) => {
     setNotice("");
-    // Free = downgrade; paid = Stripe Checkout (or simulated before keys exist)
+    // Before Paddle credentials exist the switch is simulated, so the plan
+    // limits can still be exercised end to end.
     if (!BILLING_LIVE) {
       setPlan(id);
       return;
     }
     if (id === "free") {
-      // Cancelling a paid plan is done in the billing portal.
-      return openPortal();
+      setNotice(
+        "To cancel or change a paid plan, use the manage-subscription link in your Paddle receipt email."
+      );
+      return;
     }
+    const priceId = PADDLE_PRICE[id];
+    if (!priceId || !orgId) {
+      setNotice("Checkout isn't available right now. Please try again later.");
+      return;
+    }
+
     setBusy(id);
     try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: id }),
+      // Paddle hosts the payment form; the plan is granted by the webhook
+      // once Paddle confirms payment, never by this click.
+      await openPaddleCheckout({
+        priceId,
+        orgId,
+        email: userEmail ?? undefined,
+        successUrl: `${window.location.origin}/pricing?checkout=success`,
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      setNotice(data.error ?? "Couldn't start checkout. Please try again.");
     } catch {
-      setNotice("Couldn't reach the payment service. Please try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const openPortal = async () => {
-    setBusy("portal");
-    setNotice("");
-    try {
-      const res = await fetch("/api/stripe/portal", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      setNotice(data.error ?? "Couldn't open billing. Please try again.");
-    } catch {
-      setNotice("Couldn't reach the payment service. Please try again.");
+      setNotice("Couldn't open checkout. Please try again.");
     } finally {
       setBusy(null);
     }
@@ -120,14 +118,10 @@ function Pricing() {
       )}
 
       {BILLING_LIVE && plan !== "free" && (
-        <button
-          onClick={openPortal}
-          disabled={busy === "portal"}
-          className="text-sm font-medium underline underline-offset-2 disabled:opacity-50"
-          style={{ color: "var(--brand)" }}
-        >
-          {busy === "portal" ? "Opening…" : "Manage billing, update card, or cancel"}
-        </button>
+        <p className="text-sm text-[var(--text-secondary)]">
+          To update your card or cancel, use the manage-subscription link in
+          your Paddle receipt email. Paddle handles billing for Fleet Wise.
+        </p>
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
