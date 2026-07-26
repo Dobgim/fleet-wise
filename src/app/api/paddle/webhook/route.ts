@@ -2,7 +2,25 @@ import { NextResponse } from "next/server";
 import { EventName } from "@paddle/paddle-node-sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPaddle, planForPriceId } from "@/lib/paddle";
+import { emailConfigured, sendEmail } from "@/lib/email";
+import { buildSubscriptionEmail } from "@/lib/emails/subscription-email";
 import type { PlanId } from "@/lib/types";
+
+type Admin = ReturnType<typeof createAdminClient>;
+
+/** The owner's email address for a garage, or null if we cannot find one. */
+async function ownerEmail(admin: Admin, orgId: string): Promise<string | null> {
+  const { data: membership } = await admin
+    .from("memberships")
+    .select("user_id")
+    .eq("org_id", orgId)
+    .eq("role", "owner")
+    .limit(1)
+    .maybeSingle();
+  if (!membership?.user_id) return null;
+  const { data } = await admin.auth.admin.getUserById(membership.user_id);
+  return data?.user?.email ?? null;
+}
 
 /**
  * Paddle webhook — the single source of truth for who is on a paid plan.
@@ -44,7 +62,39 @@ async function applySubscription(sub: Subscriptionish) {
   const active = sub.status === "active" || sub.status === "trialing";
   const plan: PlanId = active && paidPlan ? paidPlan : "free";
 
+  // Read the plan before changing it, so the welcome email fires on a real
+  // upgrade only — not on every renewal or status tick Paddle sends.
+  const { data: before } = await admin
+    .from("organizations")
+    .select("plan, name")
+    .eq("id", orgId)
+    .maybeSingle();
+  const upgraded = plan !== "free" && before?.plan !== plan;
+
   await admin.from("organizations").update({ plan }).eq("id", orgId);
+
+  if (upgraded && emailConfigured()) {
+    try {
+      const to = await ownerEmail(admin, orgId);
+      if (to) {
+        const siteUrl =
+          process.env.NEXT_PUBLIC_SITE_URL ||
+          "https://fleet-wise-delta.vercel.app";
+        const { subject, html } = buildSubscriptionEmail({
+          garageName: before?.name ?? "your garage",
+          plan,
+          siteUrl,
+          logoUrl: `${siteUrl}/logo.png`,
+        });
+        const result = await sendEmail({ to, subject, html });
+        if (!result.ok) console.error("welcome email failed", result.error);
+      }
+    } catch (err) {
+      // The subscription is already active; a failed email must never make
+      // Paddle think the webhook failed and retry the whole thing.
+      console.error("welcome email error", err);
+    }
+  }
 
   await admin.from("subscriptions").upsert(
     {
