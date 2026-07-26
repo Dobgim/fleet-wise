@@ -152,10 +152,19 @@
     color: #fff; font-size: 3vmin; font-weight: 600;
     padding: 2.2vmin 3vmin; border-radius: 3.4vmin;
     white-space: nowrap; overflow: hidden;
-    width: 0;
+    width: 0; min-width: 0; max-width: 100%;
     animation: type 1.5s 16.5s forwards steps(38, end);
   }
   @keyframes type { to { width: 62vmin; } }
+
+  /* Portrait (phone / TikTok): vmin is the narrow side, so the typed bubble
+     needs a bigger share of it and smaller text to hold the same sentence. */
+  @media (max-aspect-ratio: 1/1) {
+    .chat { width: 84vw; }
+    .bubble-user { font-size: 2.7vmin; }
+    .bubble-ai, .caption { font-size: 2.9vmin; }
+    @keyframes type { to { width: 61vmin; } }
+  }
 
   .bubble-ai {
     align-self: flex-start; text-align: left;
@@ -199,13 +208,43 @@
     box-shadow: 0 1.6vmin 3.4vmin rgba(58,80,180,.3);
   }
 
+  /* Animations hold still until the viewer presses play, so the audio
+     schedule and the visual timeline start on exactly the same tick. */
+  #stage, #stage * { animation-play-state: paused; }
+  body.playing #stage, body.playing #stage * { animation-play-state: running; }
+
+  /* Start overlay */
+  .start {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2.4vmin;
+    background: var(--bg);
+    transition: opacity .45s ease, visibility .45s;
+  }
+  body.playing .start { opacity: 0; visibility: hidden; }
+  .start .play {
+    display: flex; align-items: center; gap: 1.6vmin;
+    font: inherit; font-size: 3.1vmin; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg, var(--blue), var(--violet));
+    border: 0; border-radius: 10vmin; padding: 2.2vmin 5.2vmin; cursor: pointer;
+    box-shadow: 0 2vmin 4vmin rgba(58,80,180,.32);
+  }
+  .start .play:hover { filter: brightness(1.07); }
+  .start .muted {
+    font: inherit; font-size: 2.2vmin; color: var(--muted);
+    background: none; border: 0; cursor: pointer; text-decoration: underline;
+  }
+  .start .hint { font-size: 2.1vmin; color: var(--muted); max-width: 60vmin; text-align: center; }
+  .start-row { display: flex; gap: 3.4vmin; align-items: center; }
+
   /* Controls — hidden while recording (they fade out on their own). */
   .controls {
     position: fixed; bottom: 2.2vmin; left: 50%; transform: translateX(-50%);
     display: flex; gap: 1.2vmin; z-index: 10;
     opacity: .95; transition: opacity .25s;
-    animation: hideControls .4s 1.2s forwards;
   }
+  /* Stay put while the viewer sets up; clear out once the film runs. */
+  body.playing .controls { animation: hideControls .4s 1.2s forwards; }
   @keyframes hideControls { to { opacity: 0; pointer-events: none; } }
   .controls:hover { opacity: .95 !important; pointer-events: auto !important; animation: none; }
   body:hover .controls { opacity: .35; pointer-events: auto; animation: none; }
@@ -296,6 +335,16 @@
 
 </div>
 
+<div class="start" id="start">
+  <button class="play" id="playBtn">▶ Play with sound</button>
+  <div class="start-row">
+    <button class="muted" id="fsBtn">⛶ Full screen</button>
+    <button class="muted" id="mutedBtn">play without sound</button>
+  </div>
+  <p class="hint">To film it: go full screen, start your screen recorder,
+     then press play. About 26 seconds.</p>
+</div>
+
 <div class="controls">
   <button onclick="location.reload()">↻ Replay</button>
   <button onclick="document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()">⛶ Full screen</button>
@@ -312,12 +361,155 @@
   const seek = parseFloat(params.get("seek"));
   if (!Number.isNaN(seek)) {
     addEventListener("load", () => {
+      document.body.classList.add("playing");
       for (const a of document.getAnimations()) {
         a.currentTime = seek * 1000;
         a.pause();
       }
     });
   }
+
+  /* ------------------------------------------------------------------
+     Score. Everything is synthesised live — no audio files — so it stays
+     self-contained and a screen recorder picks it up as desktop audio.
+     Times are seconds from the moment play is pressed, matching the CSS
+     delays exactly.
+  ------------------------------------------------------------------ */
+  function playScore() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const master = ctx.createGain();
+    master.gain.value = 0.34;
+    master.connect(ctx.destination);
+
+    // Gentle high cut so nothing sounds harsh on phone speakers.
+    const softener = ctx.createBiquadFilter();
+    softener.type = "lowpass";
+    softener.frequency.value = 6200;
+    softener.connect(master);
+
+    const t0 = ctx.currentTime + 0.06;
+
+    // One reusable noise buffer for the whooshes.
+    const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+
+    /** A soft sustained voice — the pad. */
+    function pad(at, freq, dur, level = 0.05, type = "triangle") {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      const f = ctx.createBiquadFilter();
+      o.type = type;
+      o.frequency.value = freq;
+      f.type = "lowpass";
+      f.frequency.setValueAtTime(700, t0 + at);
+      f.frequency.linearRampToValueAtTime(1900, t0 + at + dur * 0.5);
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(level, t0 + at + 1.1);
+      g.gain.setValueAtTime(level, t0 + at + dur - 1.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+      o.connect(f); f.connect(g); g.connect(softener);
+      o.start(t0 + at); o.stop(t0 + at + dur + 0.1);
+    }
+
+    /** Short pitched blip — ticks, chimes, the alert. */
+    function blip(at, freq, dur, level = 0.16, type = "sine", bend = 1) {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t0 + at);
+      if (bend !== 1)
+        o.frequency.exponentialRampToValueAtTime(freq * bend, t0 + at + dur);
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(level, t0 + at + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+      o.connect(g); g.connect(softener);
+      o.start(t0 + at); o.stop(t0 + at + dur + 0.05);
+    }
+
+    /** Filtered noise sweep — the transition between scenes. */
+    function whoosh(at, level = 0.075, dur = 0.85) {
+      const s = ctx.createBufferSource();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      s.buffer = noiseBuf;
+      f.type = "bandpass";
+      f.Q.value = 0.9;
+      f.frequency.setValueAtTime(320, t0 + at);
+      f.frequency.exponentialRampToValueAtTime(2400, t0 + at + dur * 0.55);
+      f.frequency.exponentialRampToValueAtTime(500, t0 + at + dur);
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(level, t0 + at + dur * 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+      s.connect(f); f.connect(g); g.connect(softener);
+      s.start(t0 + at); s.stop(t0 + at + dur + 0.05);
+    }
+
+    // --- Harmonic bed. Three movements: settled, unsettled, resolved. ---
+    // D minor feel while the problem is stated…
+    pad(0.0, 146.83, 11.6, 0.055);            // D3
+    pad(0.0, 220.00, 11.6, 0.035);            // A3
+    pad(0.4, 349.23, 11.2, 0.022, "sine");    // F4
+    // …tension as the overdue alert lands…
+    pad(11.3, 174.61, 5.2, 0.055);            // F3
+    pad(11.3, 233.08, 5.2, 0.032);            // Bb3
+    pad(11.6, 415.30, 4.9, 0.020, "sine");    // Ab4 — unsettled
+    // …brightening as the AI answers…
+    pad(16.0, 196.00, 6.0, 0.055);            // G3
+    pad(16.0, 293.66, 6.0, 0.034);            // D4
+    pad(16.3, 392.00, 5.7, 0.022, "sine");    // G4
+    // …resolving on the call to action.
+    pad(21.6, 174.61, 4.8, 0.060);            // F3
+    pad(21.6, 261.63, 4.8, 0.038);            // C4
+    pad(21.9, 349.23, 4.5, 0.028, "sine");    // F4
+    pad(22.2, 440.00, 4.2, 0.018, "sine");    // A4
+
+    // --- Scene transitions ---
+    whoosh(0.05, 0.09);        // logo arrives
+    whoosh(4.1);               // "don't break down suddenly"
+    whoosh(7.8);               // "slowly — then all at once"
+    whoosh(11.3, 0.085);       // dashboard
+    whoosh(16.0);              // the AI
+    whoosh(21.6, 0.095, 1.0);  // call to action
+
+    // --- Detail hits, matched to the visuals ---
+    blip(1.55, 880, 0.5, 0.10, "sine", 1.5);          // pulse dot lands
+    blip(11.62, 660, 0.14, 0.085, "sine");            // tile 1
+    blip(11.82, 784, 0.14, 0.085, "sine");            // tile 2
+    blip(12.02, 988, 0.16, 0.085, "sine");            // tile 3
+    blip(12.6, 196, 0.55, 0.14, "triangle", 0.82);    // overdue alert — falls
+    blip(12.62, 262, 0.45, 0.06, "sine", 0.85);
+
+    // Typing the question, 16.5s → 18.0s
+    for (let i = 0; i < 24; i++)
+      blip(16.5 + i * 0.062, 2100 + Math.random() * 700, 0.03, 0.028, "square");
+
+    blip(18.62, 587.33, 0.42, 0.10, "sine", 1.34);    // answer appears
+    blip(18.70, 880.00, 0.38, 0.055, "sine", 1.25);
+
+    // Resolve under the logo
+    blip(23.15, 523.25, 0.9, 0.10, "sine");
+    blip(23.20, 698.46, 0.9, 0.07, "sine");
+    blip(23.25, 1046.50, 1.0, 0.045, "sine");
+
+    // Fade the whole thing out with the last scene.
+    master.gain.setValueAtTime(0.34, t0 + 24.6);
+    master.gain.exponentialRampToValueAtTime(0.0001, t0 + 26.0);
+    setTimeout(() => ctx.close(), 27000);
+  }
+
+  function start(withSound) {
+    document.body.classList.add("playing");
+    if (withSound) {
+      try { playScore(); } catch (e) { console.warn("audio unavailable", e); }
+    }
+  }
+  document.getElementById("playBtn").onclick = () => start(true);
+  document.getElementById("mutedBtn").onclick = () => start(false);
+  document.getElementById("fsBtn").onclick = () =>
+    document.documentElement.requestFullscreen?.();
 </script>
 
 </body>
