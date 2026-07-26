@@ -336,13 +336,15 @@
 </div>
 
 <div class="start" id="start">
-  <button class="play" id="playBtn">▶ Play with sound</button>
+  <button class="play" id="playBtn">▶ Play with voice</button>
   <div class="start-row">
     <button class="muted" id="fsBtn">⛶ Full screen</button>
-    <button class="muted" id="mutedBtn">play without sound</button>
+    <button class="muted" id="musicBtn">music only</button>
+    <button class="muted" id="silentBtn">silent</button>
   </div>
   <p class="hint">To film it: go full screen, start your screen recorder,
-     then press play. About 26 seconds.</p>
+     then press play. About 26 seconds. Choose <b>silent</b> if you want to
+     record your own voice over it afterwards.</p>
 </div>
 
 <div class="controls">
@@ -375,12 +377,66 @@
      Times are seconds from the moment play is pressed, matching the CSS
      delays exactly.
   ------------------------------------------------------------------ */
-  function playScore() {
+  /* ------------------------------------------------------------------
+     Narration. Spoken by the browser's own speech engine, so there is no
+     audio file to ship. Each line is timed to land inside its scene, and
+     kept short enough to finish before the scene changes.
+     These are also the exact lines to read if recording a human voice.
+  ------------------------------------------------------------------ */
+  const NARRATION = [
+    { at: 1.4,  say: "Fleet Wise A I." },
+    { at: 4.6,  say: "Vehicles don't break down suddenly." },
+    { at: 8.3,  say: "They break down slowly. Then all at once." },
+    { at: 11.9, say: "Fleet Wise warns you a week before every service." },
+    { at: 16.4, say: "And you can just ask." },
+    { at: 18.9, say: "It reads your own records, and answers." },
+    { at: 22.1, say: "Fleet Wise A I. Fewer breakdowns. Lower costs." },
+  ];
+
+  /** Pick the most natural English voice this device offers. */
+  function pickVoice() {
+    const voices = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+    if (!voices.length) return null;
+    const score = v => {
+      const n = v.name.toLowerCase();
+      if (n.includes("natural") || n.includes("neural")) return 3;
+      if (n.includes("online")) return 2;
+      if (n.includes("google") || n.includes("aria") || n.includes("guy")) return 1;
+      return 0;
+    };
+    return voices.slice().sort((a, b) => score(b) - score(a))[0];
+  }
+
+  function playNarration() {
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const voice = pickVoice();
+    for (const line of NARRATION) {
+      setTimeout(() => {
+        const u = new SpeechSynthesisUtterance(line.say);
+        if (voice) u.voice = voice;
+        u.rate = 1.02;
+        u.pitch = 1.0;
+        u.volume = 1.0;
+        speechSynthesis.speak(u);
+      }, line.at * 1000);
+    }
+  }
+
+  // Voice list often loads late; warm it up so the first pick is a good one.
+  if ("speechSynthesis" in window) {
+    speechSynthesis.getVoices();
+    speechSynthesis.addEventListener?.("voiceschanged", () => {});
+  }
+
+  function playScore(musicLevel = 1) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
     const master = ctx.createGain();
-    master.gain.value = 0.34;
+    // Ducked when a voice is speaking over it, so the words stay clear.
+    const baseLevel = 0.34 * musicLevel;
+    master.gain.value = baseLevel;
     master.connect(ctx.destination);
 
     // Gentle high cut so nothing sounds harsh on phone speakers.
@@ -495,19 +551,25 @@
     blip(23.25, 1046.50, 1.0, 0.045, "sine");
 
     // Fade the whole thing out with the last scene.
-    master.gain.setValueAtTime(0.34, t0 + 24.6);
+    master.gain.setValueAtTime(baseLevel, t0 + 24.6);
     master.gain.exponentialRampToValueAtTime(0.0001, t0 + 26.0);
     setTimeout(() => ctx.close(), 27000);
   }
 
-  function start(withSound) {
+  function start(mode) {
     document.body.classList.add("playing");
-    if (withSound) {
-      try { playScore(); } catch (e) { console.warn("audio unavailable", e); }
+    if (mode === "voice" || mode === "music") {
+      try {
+        playScore(mode === "voice" ? 0.45 : 1);
+      } catch (e) {
+        console.warn("audio unavailable", e);
+      }
     }
+    if (mode === "voice") playNarration();
   }
-  document.getElementById("playBtn").onclick = () => start(true);
-  document.getElementById("mutedBtn").onclick = () => start(false);
+  document.getElementById("playBtn").onclick = () => start("voice");
+  document.getElementById("musicBtn").onclick = () => start("music");
+  document.getElementById("silentBtn").onclick = () => start("silent");
   document.getElementById("fsBtn").onclick = () =>
     document.documentElement.requestFullscreen?.();
 </script>
