@@ -53,15 +53,28 @@ export function buildReminderEmail(params: {
   const overdue = items.filter((i) => i.status === "overdue");
   const upcoming = items.filter((i) => i.status === "upcoming");
 
+  // The three-day nudge must not read like the week-ahead warning, or the
+  // second email is ignored exactly when it matters most.
+  const soonest = upcoming.length
+    ? Math.min(...upcoming.map((i) => i.daysDiff))
+    : null;
   const subject = overdue.length
     ? `${overdue.length} overdue service${overdue.length === 1 ? "" : "s"} in ${garageName}`
-    : `${upcoming.length} service${upcoming.length === 1 ? "" : "s"} due soon in ${garageName}`;
+    : soonest === 0
+      ? `Service due today in ${garageName}`
+      : soonest !== null && soonest <= 3
+        ? `Service due in ${days(soonest)} — ${garageName}`
+        : `${upcoming.length} service${upcoming.length === 1 ? "" : "s"} due soon in ${garageName}`;
 
   const summary = [
     overdue.length
       ? `<b style="color:#8a1f1f;">${overdue.length} overdue</b>`
       : "",
-    upcoming.length ? `${upcoming.length} due within the next week` : "",
+    upcoming.length
+      ? soonest !== null && soonest <= 3
+        ? `<b>${upcoming.length} due within ${days(soonest)}</b>`
+        : `${upcoming.length} due within the next week`
+      : "",
   ]
     .filter(Boolean)
     .join(" · ");

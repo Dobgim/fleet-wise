@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/emails/reminder-template";
-import { getMaintenanceItems } from "@/lib/insights";
+import { getMaintenanceItems, type MaintenanceItem } from "@/lib/insights";
 import type { ServiceRecord, ServiceType, Vehicle } from "@/lib/types";
 
 /**
@@ -103,12 +103,23 @@ export async function GET(request: Request) {
       createdAt: r.created_at,
     }));
 
-    // The reminder policy: one email when a service comes within 7 days of
-    // its predicted date, one more if it tips into overdue. The dashboard
-    // keeps its wider 30-day view; email is deliberately less chatty.
+    // The reminder policy: warn a week out, nudge again three days out, and
+    // say so once if it slips past due. Each stage fires exactly once per
+    // predicted service, so nothing nags daily. The dashboard keeps its
+    // wider 30-day view; email is deliberately less chatty.
     const candidates = getMaintenanceItems(vehicles, records)
-      .filter((it) => it.status === "overdue" || it.daysDiff <= 7)
-      .map((it) => ({ item: it, stage: it.status }));
+      .map((it) => {
+        const stage =
+          it.status === "overdue"
+            ? "overdue"
+            : it.daysDiff <= 3
+              ? "upcoming_3"
+              : it.daysDiff <= 7
+                ? "upcoming_7"
+                : null;
+        return stage ? { item: it, stage } : null;
+      })
+      .filter((c): c is { item: MaintenanceItem; stage: string } => c !== null);
     if (candidates.length === 0) {
       summary.skippedNothingDue++;
       continue;
