@@ -29,24 +29,59 @@ export default function PricingPage() {
 }
 
 function Pricing() {
-  const { ready, plan, budget, vehicles, setPlan, orgId, userEmail } =
+  const { ready, plan, budget, vehicles, setPlan, orgId, userEmail, refreshOrg } =
     useFleet();
   const router = useRouter();
   const params = useSearchParams();
   const [busy, setBusy] = useState<PlanId | "portal" | null>(null);
   const [notice, setNotice] = useState("");
 
-  // Banner after returning from Stripe Checkout.
+  // Returning from checkout. Paddle sends the browser back within about a
+  // second, but the plan is granted asynchronously by the webhook — so poll
+  // for it rather than showing whatever the page happened to load with.
   useEffect(() => {
     const c = params.get("checkout");
-    if (c === "success")
-      setNotice(
-        "Payment received — thank you! Your new plan will be active within a few seconds."
-      );
-    else if (c === "cancelled")
+    if (!c) return;
+    router.replace("/pricing");
+
+    if (c === "cancelled") {
       setNotice("Checkout cancelled — no charge was made.");
-    if (c) router.replace("/pricing");
-  }, [params, router]);
+      return;
+    }
+    if (c !== "success") return;
+
+    setNotice("Payment received — activating your plan…");
+    let cancelled = false;
+    let attempts = 0;
+    const tick = async () => {
+      if (cancelled) return;
+      attempts++;
+      await refreshOrg();
+      // refreshOrg updates state; the effect below reacts to the new plan.
+      if (attempts < 12 && !cancelled) setTimeout(tick, 2000);
+      else if (!cancelled)
+        setNotice(
+          "Payment received. Your plan is taking longer than usual to activate — refresh in a moment, or contact us if it persists."
+        );
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [params, router, refreshOrg]);
+
+  // The plan can change outside this tab — a webhook after checkout, or a
+  // cancellation in Paddle. Re-read it whenever the page is opened.
+  useEffect(() => {
+    void refreshOrg();
+  }, [refreshOrg]);
+
+  // Stop polling and celebrate once the paid plan actually lands.
+  useEffect(() => {
+    if (plan !== "free" && notice.startsWith("Payment received — activating")) {
+      setNotice(`You're on ${PLANS[plan].name} — thank you!`);
+    }
+  }, [plan, notice]);
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
@@ -64,7 +99,16 @@ function Pricing() {
     }
     if (id === "free") {
       setNotice(
-        "To cancel or change a paid plan, use the manage-subscription link in your Paddle receipt email."
+        "To cancel a paid plan, use the manage-subscription link in your Paddle receipt email."
+      );
+      return;
+    }
+    // Opening a second checkout would create a second subscription and bill
+    // the customer twice. Plan changes belong in Paddle's own subscription
+    // management, which prorates properly.
+    if (plan !== "free") {
+      setNotice(
+        `You already have an active ${PLANS[plan].name} subscription. To move to ${PLANS[id].name}, use the manage-subscription link in your Paddle receipt email — buying here would charge you twice.`
       );
       return;
     }

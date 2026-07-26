@@ -45,6 +45,8 @@ interface FleetContextValue {
   /** Apply the authoritative budget returned by /api/copilot. */
   applyBudget: (b: AiBudget) => void;
   refreshBudget: () => Promise<void>;
+  /** Re-read the org (plan, name, reminder flag) and the token budget. */
+  refreshOrg: () => Promise<void>;
   addVehicle: (v: Omit<Vehicle, "id" | "createdAt">) => void;
   updateVehicle: (id: string, patch: Partial<Omit<Vehicle, "id">>) => void;
   deleteVehicle: (id: string) => void;
@@ -131,6 +133,27 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const applyBudget = useCallback((b: AiBudget) => {
     if (b) setBudget(b);
   }, []);
+
+  /**
+   * Re-read the organization. Needed after checkout: Paddle returns the
+   * browser here within a second, but the plan is granted asynchronously by
+   * the webhook, so the page must look again rather than trust what it
+   * loaded with.
+   */
+  const refreshOrg = useCallback(async () => {
+    if (!orgId) return;
+    const { data } = await supabase
+      .from("organizations")
+      .select("plan, name, reminders_enabled")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (data) {
+      setPlanState((data.plan as PlanId) ?? "free");
+      setOrgName(data.name ?? null);
+      setRemindersState(data.reminders_enabled ?? true);
+    }
+    await refreshBudget();
+  }, [supabase, orgId, refreshBudget]);
 
   const fetchFleet = useCallback(
     async (org: string) => {
@@ -471,6 +494,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         setPlan,
         applyBudget,
         refreshBudget,
+        refreshOrg,
         addVehicle,
         updateVehicle,
         deleteVehicle,
