@@ -2,9 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Fleet Wise AI — promo</title>
 <style>
+  /* ====================================================================
+     TIMELINE (seconds) — CSS delays below and the audio/narration
+     schedule in the script must stay in step with this table.
+
+       S1  logo            0.0 →  7.0
+       S2  problem A       7.0 → 10.6
+       S3  problem B      10.6 → 18.0
+       S4  dashboard      18.0 → 28.0
+       S5  the AI         28.0 → 40.0
+       S6  call to action 40.0 → 48.0
+     ==================================================================== */
+
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
@@ -13,7 +25,6 @@
     --ink: #0b0b0b;
     --muted: #6b6b70;
     --red: #d03b3b;
-    --amber: #e0a800;
     --card: #ffffff;
     --bg: #f4f5f7;
   }
@@ -27,35 +38,34 @@
     overflow: hidden;
   }
 
-  /* Stage scales with the smaller viewport dimension so it looks right
-     in landscape (desktop capture) and portrait (phone / TikTok). */
   .stage {
     position: relative;
-    width: 100vw; height: 100vh;
+    width: 100vw; height: 100dvh;
     display: flex; align-items: center; justify-content: center;
-    background:
-      radial-gradient(120% 80% at 50% 0%, #ffffff 0%, var(--bg) 60%);
+    background: radial-gradient(120% 80% at 50% 0%, #ffffff 0%, var(--bg) 60%);
     overflow: hidden;
   }
 
   .scene {
-    position: absolute;
-    inset: 0;
+    position: absolute; inset: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 2.4vmin;
-    padding: 6vmin;
+    gap: 2.4vmin; padding: 7vmin;
     text-align: center;
     opacity: 0;
     animation-fill-mode: both;
     animation-timing-function: cubic-bezier(.22,.61,.36,1);
   }
+  /* Flex children default to min-width:auto and will happily overflow the
+     screen on a narrow phone. Keep every scene element inside the frame. */
+  .scene > * { max-width: 100%; min-width: 0; }
 
+  /* Long hold, gentle fade at each end so scenes cross-dissolve. */
   @keyframes sceneIn {
-    0%   { opacity: 0; transform: translateY(2.2vmin) scale(.985); }
-    12%  { opacity: 1; transform: none; }
-    88%  { opacity: 1; transform: none; }
-    100% { opacity: 0; transform: translateY(-1.4vmin) scale(1.005); }
+    0%   { opacity: 0; transform: translateY(2vmin) scale(.99); }
+    9%   { opacity: 1; transform: none; }
+    91%  { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-1.2vmin) scale(1.004); }
   }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(1.6vmin); }
@@ -67,12 +77,10 @@
     100% { opacity: 1; transform: scale(1); }
   }
 
-  /* ---------- Scene 1: logo reveal ---------- */
-  #s1 { animation: sceneIn 4s 0s 1; }
-
+  /* ---------- S1 · logo ---------- */
+  #s1 { animation: sceneIn 7s 0s 1; }
   .mark {
-    width: 22vmin; height: 22vmin;
-    border-radius: 5.5vmin;
+    width: 22vmin; height: 22vmin; border-radius: 5.5vmin;
     background: linear-gradient(135deg, var(--blue), var(--violet));
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 3vmin 6vmin rgba(58,80,180,.28);
@@ -80,71 +88,64 @@
   }
   .mark svg { width: 68%; height: 68%; }
   .pulse-path {
-    stroke-dasharray: 120;
-    stroke-dashoffset: 120;
-    animation: draw 1.1s .6s forwards cubic-bezier(.5,0,.2,1);
+    stroke-dasharray: 120; stroke-dashoffset: 120;
+    animation: draw 1.2s .6s forwards cubic-bezier(.5,0,.2,1);
   }
   @keyframes draw { to { stroke-dashoffset: 0; } }
-  .dot { opacity: 0; animation: pop .4s 1.6s both; }
-
+  .dot { opacity: 0; animation: pop .45s 1.7s both; }
   .wordmark {
     font-size: 7.6vmin; font-weight: 800; letter-spacing: -.02em;
-    animation: fadeUp .8s 1.5s both;
+    animation: fadeUp .9s 1.6s both;
   }
   .wordmark span { color: var(--blue); }
   .tag {
     font-size: 2.5vmin; letter-spacing: .26em; text-transform: uppercase;
     color: var(--muted); font-weight: 600;
-    animation: fadeUp .8s 1.85s both;
+    animation: fadeUp .9s 2s both;
   }
 
-  /* ---------- Scenes 2 & 3: the problem ---------- */
-  #s2 { animation: sceneIn 3.6s 4.1s 1; }
-  #s3 { animation: sceneIn 3.4s 7.8s 1; }
-
+  /* ---------- S2 / S3 · the problem ---------- */
+  #s2 { animation: sceneIn 3.8s 7s 1; }
+  #s3 { animation: sceneIn 7.6s 10.6s 1; }
   .line {
-    font-size: 6.4vmin; font-weight: 700; line-height: 1.22;
-    max-width: 88%; letter-spacing: -.015em;
+    font-size: 6.2vmin; font-weight: 700; line-height: 1.24;
+    max-width: 90%; letter-spacing: -.015em;
   }
   .line em { font-style: normal; color: var(--blue); }
-  .sub { font-size: 3.1vmin; color: var(--muted); max-width: 74%; }
+  .sub { font-size: 3.1vmin; color: var(--muted); max-width: 76%; }
+  #s3 .sub { animation: fadeUp .9s 13.4s both; }
 
-  /* ---------- Scene 4: dashboard ---------- */
-  #s4 { animation: sceneIn 4.6s 11.3s 1; }
-
+  /* ---------- S4 · dashboard ---------- */
+  #s4 { animation: sceneIn 10.2s 18s 1; }
   .tiles { display: flex; gap: 2vmin; flex-wrap: wrap; justify-content: center; }
   .tile {
     background: var(--card); border-radius: 2.2vmin;
     padding: 2.6vmin 3.4vmin; min-width: 24vmin;
     box-shadow: 0 1.4vmin 3.2vmin rgba(20,25,50,.09);
-    text-align: left;
-    animation: pop .6s both;
+    text-align: left; animation: pop .7s both;
   }
-  .tile:nth-child(1) { animation-delay: 11.6s; }
-  .tile:nth-child(2) { animation-delay: 11.8s; }
-  .tile:nth-child(3) { animation-delay: 12.0s; }
+  .tile:nth-child(1) { animation-delay: 18.4s; }
+  .tile:nth-child(2) { animation-delay: 18.65s; }
+  .tile:nth-child(3) { animation-delay: 18.9s; }
   .tile .k { font-size: 2.1vmin; color: var(--muted); }
   .tile .v { font-size: 5.4vmin; font-weight: 800; margin-top: .5vmin; }
   .tile .v.warn { color: var(--red); }
-
   .alert {
     display: flex; align-items: center; gap: 1.6vmin;
     background: #fdeeee; color: #8a1f1f;
-    border-left: .7vmin solid var(--red);
-    border-radius: 1.4vmin;
-    padding: 2.2vmin 3vmin;
-    font-size: 2.9vmin; font-weight: 600;
-    animation: fadeUp .7s 12.6s both;
+    border-left: .7vmin solid var(--red); border-radius: 1.4vmin;
+    padding: 2.2vmin 3vmin; font-size: 2.9vmin; font-weight: 600;
+    animation: fadeUp .8s 20s both;
     box-shadow: 0 1vmin 2.4vmin rgba(180,40,40,.12);
   }
   .alert .badge {
     background: var(--red); color: #fff; border-radius: 10vmin;
     font-size: 2.1vmin; padding: .5vmin 1.6vmin; font-weight: 700;
   }
+  #s4 .sub { animation: fadeUp .9s 22.4s both; }
 
-  /* ---------- Scene 5: the AI ---------- */
-  #s5 { animation: sceneIn 5.4s 16s 1; }
-
+  /* ---------- S5 · the AI ---------- */
+  #s5 { animation: sceneIn 12.2s 28s 1; }
   .chat { width: min(86vw, 92vmin); display: flex; flex-direction: column; gap: 2vmin; }
   .bubble-user {
     align-self: flex-end;
@@ -153,72 +154,83 @@
     padding: 2.2vmin 3vmin; border-radius: 3.4vmin;
     white-space: nowrap; overflow: hidden;
     width: 0; min-width: 0; max-width: 100%;
-    animation: type 1.5s 16.5s forwards steps(38, end);
+    animation: type 2.8s 30.5s forwards steps(38, end);
   }
   @keyframes type { to { width: 62vmin; } }
-
-  /* Portrait (phone / TikTok): vmin is the narrow side, so the typed bubble
-     needs a bigger share of it and smaller text to hold the same sentence. */
-  @media (max-aspect-ratio: 1/1) {
-    .chat { width: 84vw; }
-    .bubble-user { font-size: 2.7vmin; }
-    .bubble-ai, .caption { font-size: 2.9vmin; }
-    @keyframes type { to { width: 61vmin; } }
-  }
-
-  .bubble-ai {
-    align-self: flex-start; text-align: left;
-    font-size: 3vmin; line-height: 1.5; max-width: 84%;
-    color: var(--ink);
-    animation: fadeUp .8s 18.6s both;
-  }
-  .bubble-ai b { color: var(--blue); }
   .thinking {
     align-self: flex-start; display: flex; gap: 1vmin;
-    animation: fadeUp .3s 18.1s both, fadeOutQuick .3s 18.6s forwards;
+    animation: fadeUp .35s 33.8s both, fadeOutQuick .3s 35s forwards;
   }
   @keyframes fadeOutQuick { to { opacity: 0; height: 0; } }
   .thinking i {
     width: 1.4vmin; height: 1.4vmin; border-radius: 50%;
-    background: #b9bcc4; display: block;
-    animation: bounce 1s infinite;
+    background: #b9bcc4; display: block; animation: bounce 1s infinite;
   }
   .thinking i:nth-child(2) { animation-delay: .15s; }
   .thinking i:nth-child(3) { animation-delay: .3s; }
   @keyframes bounce { 0%,60%,100% { transform: none; } 30% { transform: translateY(-1vmin); } }
-
+  .bubble-ai {
+    align-self: flex-start; text-align: left;
+    font-size: 3vmin; line-height: 1.5; max-width: 84%; color: var(--ink);
+    animation: fadeUp .9s 35s both;
+  }
+  .bubble-ai b { color: var(--blue); }
   .caption {
     font-size: 2.6vmin; color: var(--muted); margin-top: 1vmin;
-    animation: fadeUp .8s 20.2s both;
+    animation: fadeUp .9s 37.6s both;
   }
 
-  /* ---------- Scene 6: call to action ---------- */
-  #s6 { animation: sceneIn 4.4s 21.6s 1; animation-fill-mode: both; }
-  #s6 .mark { width: 17vmin; height: 17vmin; border-radius: 4.4vmin; animation: pop .8s 21.8s both; }
-  #s6 .pulse-path { animation: draw 1s 22.1s forwards; }
-  #s6 .dot { animation: pop .4s 23s both; }
-  .cta-name { font-size: 6.4vmin; font-weight: 800; animation: fadeUp .7s 22.4s both; letter-spacing: -.02em; }
+  /* ---------- S6 · call to action ---------- */
+  #s6 { animation: sceneIn 8s 40s 1; }
+  #s6 .mark { width: 17vmin; height: 17vmin; border-radius: 4.4vmin; animation: pop .9s 40.3s both; }
+  #s6 .pulse-path { animation: draw 1.1s 40.7s forwards; }
+  #s6 .dot { animation: pop .45s 41.7s both; }
+  .cta-name { font-size: 6.4vmin; font-weight: 800; letter-spacing: -.02em; animation: fadeUp .8s 41s both; }
   .cta-name span { color: var(--blue); }
-  .cta-sub { font-size: 3.4vmin; color: var(--muted); animation: fadeUp .7s 22.7s both; }
+  .cta-sub { font-size: 3.4vmin; color: var(--muted); animation: fadeUp .8s 41.5s both; }
   .cta-url {
     font-size: 3.4vmin; font-weight: 700; color: #fff;
     background: linear-gradient(135deg, var(--blue), var(--violet));
     padding: 1.8vmin 4.4vmin; border-radius: 10vmin;
-    animation: pop .7s 23.1s both;
+    animation: pop .8s 42.1s both;
     box-shadow: 0 1.6vmin 3.4vmin rgba(58,80,180,.3);
   }
 
-  /* Animations hold still until the viewer presses play, so the audio
-     schedule and the visual timeline start on exactly the same tick. */
+  /* Portrait (phone / TikTok): vmin is the narrow side, so the typed
+     bubble needs a bigger share of it and smaller text. */
+  @media (max-aspect-ratio: 1/1) {
+    .chat { width: 84vw; }
+    .bubble-user { font-size: 2.7vmin; }
+    .bubble-ai, .caption { font-size: 2.9vmin; }
+    .line { font-size: 6.8vmin; }
+    @keyframes type { to { width: 61vmin; } }
+
+    /* Three tiles will not sit in one row on a phone — let them wrap two
+       up, and let the alert run onto a second line instead of off-screen.
+       Sized in vw against the viewport itself: percentages here resolve
+       against a parent that flex sizing had already allowed to overflow. */
+    .scene { padding: 5vmin; }
+    .tiles { width: 86vw; max-width: 86vw; }
+    .tile { min-width: 0; flex: 1 1 38%; padding: 2.6vmin 3vmin; }
+    .tile .k { font-size: 2.5vmin; }
+    .tile .v { font-size: 6.4vmin; }
+    .alert {
+      max-width: 86vw; min-width: 0; font-size: 3vmin;
+      align-items: flex-start; text-align: left;
+    }
+    #s4 .sub, #s3 .sub, .line { max-width: 86vw; }
+    .alert .badge { font-size: 2.5vmin; flex-shrink: 0; }
+    #s4 .sub, #s3 .sub { font-size: 3.4vmin; max-width: 92%; }
+  }
+
+  /* Hold still until play is pressed, so audio and picture start together. */
   #stage, #stage * { animation-play-state: paused; }
   body.playing #stage, body.playing #stage * { animation-play-state: running; }
 
-  /* Start overlay */
   .start {
     position: fixed; inset: 0; z-index: 20;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2.4vmin;
-    background: var(--bg);
+    gap: 2.6vmin; padding: 6vmin; background: var(--bg);
     transition: opacity .45s ease, visibility .45s;
   }
   body.playing .start { opacity: 0; visibility: hidden; }
@@ -229,31 +241,25 @@
     border: 0; border-radius: 10vmin; padding: 2.2vmin 5.2vmin; cursor: pointer;
     box-shadow: 0 2vmin 4vmin rgba(58,80,180,.32);
   }
-  .start .play:hover { filter: brightness(1.07); }
   .start .muted {
     font: inherit; font-size: 2.2vmin; color: var(--muted);
     background: none; border: 0; cursor: pointer; text-decoration: underline;
   }
-  .start .hint { font-size: 2.1vmin; color: var(--muted); max-width: 60vmin; text-align: center; }
-  .start-row { display: flex; gap: 3.4vmin; align-items: center; }
+  .start-row { display: flex; gap: 3.4vmin; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .start .hint { font-size: 2.1vmin; color: var(--muted); max-width: 64vmin; text-align: center; line-height: 1.5; }
 
-  /* Controls — hidden while recording (they fade out on their own). */
   .controls {
     position: fixed; bottom: 2.2vmin; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 1.2vmin; z-index: 10;
-    opacity: .95; transition: opacity .25s;
+    display: flex; gap: 1.2vmin; z-index: 10; opacity: .95; transition: opacity .25s;
   }
-  /* Stay put while the viewer sets up; clear out once the film runs. */
   body.playing .controls { animation: hideControls .4s 1.2s forwards; }
   @keyframes hideControls { to { opacity: 0; pointer-events: none; } }
-  .controls:hover { opacity: .95 !important; pointer-events: auto !important; animation: none; }
   body:hover .controls { opacity: .35; pointer-events: auto; animation: none; }
   .controls button {
     font: inherit; font-size: 1.9vmin; font-weight: 600;
     border: 1px solid #d3d6dc; background: #fff; color: var(--ink);
     border-radius: 10vmin; padding: 1vmin 2.6vmin; cursor: pointer;
   }
-  .controls button:hover { background: #f0f2f6; }
 
   @media (prefers-color-scheme: dark) {
     :root { --bg: #0d0d10; --ink: #f4f4f6; --muted: #9a9aa4; --card: #1a1a20; }
@@ -267,7 +273,6 @@
 
 <div class="stage" id="stage">
 
-  <!-- 1 · Logo -->
   <section class="scene" id="s1">
     <div class="mark">
       <svg viewBox="0 0 32 32" fill="none">
@@ -280,18 +285,15 @@
     <div class="tag">AI vehicle maintenance</div>
   </section>
 
-  <!-- 2 · Problem -->
   <section class="scene" id="s2">
-    <h1 class="line">Vehicles don't break down<br><em>suddenly.</em></h1>
+    <h1 class="line">Vehicles rarely fail<br><em>without warning.</em></h1>
   </section>
 
-  <!-- 3 · Problem, turned -->
   <section class="scene" id="s3">
-    <h1 class="line">They break down slowly —<br>then all at once.</h1>
-    <p class="sub">The oil change you skipped. The brake noise you ignored.</p>
+    <h1 class="line">They fail slowly —<br>until one day, they stop.</h1>
+    <p class="sub">A service skipped. A small noise ignored.</p>
   </section>
 
-  <!-- 4 · Dashboard -->
   <section class="scene" id="s4">
     <div class="tiles">
       <div class="tile"><div class="k">Vehicles</div><div class="v">6</div></div>
@@ -302,24 +304,22 @@
       <span class="badge">OVERDUE</span>
       TRK-012 · oil change was due 12 days ago
     </div>
-    <p class="sub">It watches every vehicle, and emails you a week before each service.</p>
+    <p class="sub">Every record in one place — and an email a week before each service.</p>
   </section>
 
-  <!-- 5 · The AI -->
   <section class="scene" id="s5">
     <div class="chat">
       <div class="bubble-user">Which vehicle is costing me the most?</div>
       <div class="thinking"><i></i><i></i><i></i></div>
       <div class="bubble-ai">
-        <b>VAN-101</b> has cost you <b>$2,480</b> in the last six months — more than
-        double the rest of your fleet. Three of those were brake repairs, which
-        usually points to a deeper fault.
+        <b>VAN-101</b> has cost you <b>$2,480</b> in the last six months — more
+        than double the rest of your fleet. Three of those were brake repairs,
+        which usually points to a deeper fault.
       </div>
     </div>
-    <p class="caption">Answered from your own service records. Just ask.</p>
+    <p class="caption">Answered from your own service records.</p>
   </section>
 
-  <!-- 6 · CTA -->
   <section class="scene" id="s6">
     <div class="mark">
       <svg viewBox="0 0 32 32" fill="none">
@@ -342,9 +342,9 @@
     <button class="muted" id="musicBtn">music only</button>
     <button class="muted" id="silentBtn">silent</button>
   </div>
-  <p class="hint">To film it: go full screen, start your screen recorder,
-     then press play. About 26 seconds. Choose <b>silent</b> if you want to
-     record your own voice over it afterwards.</p>
+  <p class="hint">Go full screen, start your screen recorder, then press play.
+     About 48 seconds. Choose <b>silent</b> if you would rather record your own
+     voice over it afterwards.</p>
 </div>
 
 <div class="controls">
@@ -355,11 +355,11 @@
 <script>
   const params = new URLSearchParams(location.search);
 
-  // Let the domain be swapped without editing the file: /promo.html?url=fleetwise.ai
+  // Swap the domain shown without editing the file: /promo.html?url=fleetwise.ai
   const q = params.get("url");
   if (q) document.getElementById("url").textContent = q;
 
-  // Jump to a moment in the timeline to check one scene: /promo.html?seek=13
+  // Jump to a moment to check one scene: /promo.html?seek=20
   const seek = parseFloat(params.get("seek"));
   if (!Number.isNaN(seek)) {
     addEventListener("load", () => {
@@ -372,36 +372,31 @@
   }
 
   /* ------------------------------------------------------------------
-     Score. Everything is synthesised live — no audio files — so it stays
-     self-contained and a screen recorder picks it up as desktop audio.
-     Times are seconds from the moment play is pressed, matching the CSS
-     delays exactly.
-  ------------------------------------------------------------------ */
-  /* ------------------------------------------------------------------
-     Narration. Spoken by the browser's own speech engine, so there is no
-     audio file to ship. Each line is timed to land inside its scene, and
-     kept short enough to finish before the scene changes.
-     These are also the exact lines to read if recording a human voice.
+     NARRATION — one continuous explanation, not a list of captions.
+     Each line is timed to start inside its scene and finish before the
+     next one begins. This is also the script to read aloud if you record
+     the voiceover yourself.
   ------------------------------------------------------------------ */
   const NARRATION = [
-    { at: 1.4,  say: "Fleet Wise A I." },
-    { at: 4.6,  say: "Vehicles don't break down suddenly." },
-    { at: 8.3,  say: "They break down slowly. Then all at once." },
-    { at: 11.9, say: "Fleet Wise warns you a week before every service." },
-    { at: 16.4, say: "And you can just ask." },
-    { at: 18.9, say: "It reads your own records, and answers." },
-    { at: 22.1, say: "Fleet Wise A I. Fewer breakdowns. Lower costs." },
+    { at: 0.9,  say: "This is Fleet Wise A I, an intelligent maintenance assistant for anyone who runs vehicles." },
+    { at: 7.5,  say: "Vehicles rarely fail without warning." },
+    { at: 11.0, say: "They fail slowly. A service skipped. A small noise ignored. Until one day, they stop." },
+    { at: 18.6, say: "Fleet Wise keeps every service record in one place, predicts when the next one is due, and emails you a week before, automatically." },
+    { at: 28.8, say: "And when you want to understand your costs, you simply ask, in your own words." },
+    { at: 35.4, say: "It reads your own service history, and answers in plain language." },
+    { at: 40.8, say: "Fleet Wise A I. Fewer breakdowns, lower costs, and full control of your fleet. Start free today." },
   ];
 
-  /** Pick the most natural English voice this device offers. */
+  /** Prefer the most natural-sounding English voice the device offers. */
   function pickVoice() {
     const voices = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
     if (!voices.length) return null;
     const score = v => {
       const n = v.name.toLowerCase();
-      if (n.includes("natural") || n.includes("neural")) return 3;
-      if (n.includes("online")) return 2;
-      if (n.includes("google") || n.includes("aria") || n.includes("guy")) return 1;
+      if (n.includes("natural") || n.includes("neural")) return 4;
+      if (n.includes("online")) return 3;
+      if (n.includes("google")) return 2;
+      if (n.includes("aria") || n.includes("guy") || n.includes("jenny")) return 1;
       return 0;
     };
     return voices.slice().sort((a, b) => score(b) - score(a))[0];
@@ -415,31 +410,28 @@
       setTimeout(() => {
         const u = new SpeechSynthesisUtterance(line.say);
         if (voice) u.voice = voice;
-        u.rate = 1.02;
+        u.rate = 0.97;   // measured, explanatory — not clipped
         u.pitch = 1.0;
         u.volume = 1.0;
         speechSynthesis.speak(u);
       }, line.at * 1000);
     }
   }
+  if ("speechSynthesis" in window) speechSynthesis.getVoices();
 
-  // Voice list often loads late; warm it up so the first pick is a good one.
-  if ("speechSynthesis" in window) {
-    speechSynthesis.getVoices();
-    speechSynthesis.addEventListener?.("voiceschanged", () => {});
-  }
-
+  /* ------------------------------------------------------------------
+     SCORE — synthesised live, so a screen recorder picks it up as
+     desktop audio and there is no file to ship. Times match the CSS.
+  ------------------------------------------------------------------ */
   function playScore(musicLevel = 1) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
     const master = ctx.createGain();
-    // Ducked when a voice is speaking over it, so the words stay clear.
-    const baseLevel = 0.34 * musicLevel;
+    const baseLevel = 0.34 * musicLevel;   // ducked under the voice
     master.gain.value = baseLevel;
     master.connect(ctx.destination);
 
-    // Gentle high cut so nothing sounds harsh on phone speakers.
     const softener = ctx.createBiquadFilter();
     softener.type = "lowpass";
     softener.frequency.value = 6200;
@@ -447,37 +439,29 @@
 
     const t0 = ctx.currentTime + 0.06;
 
-    // One reusable noise buffer for the whooshes.
     const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const nd = noiseBuf.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
 
-    /** A soft sustained voice — the pad. */
     function pad(at, freq, dur, level = 0.05, type = "triangle") {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      const f = ctx.createBiquadFilter();
-      o.type = type;
-      o.frequency.value = freq;
+      const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+      o.type = type; o.frequency.value = freq;
       f.type = "lowpass";
       f.frequency.setValueAtTime(700, t0 + at);
       f.frequency.linearRampToValueAtTime(1900, t0 + at + dur * 0.5);
       g.gain.setValueAtTime(0.0001, t0 + at);
-      g.gain.exponentialRampToValueAtTime(level, t0 + at + 1.1);
-      g.gain.setValueAtTime(level, t0 + at + dur - 1.2);
+      g.gain.exponentialRampToValueAtTime(level, t0 + at + 1.3);
+      g.gain.setValueAtTime(level, t0 + at + dur - 1.4);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
       o.connect(f); f.connect(g); g.connect(softener);
       o.start(t0 + at); o.stop(t0 + at + dur + 0.1);
     }
 
-    /** Short pitched blip — ticks, chimes, the alert. */
     function blip(at, freq, dur, level = 0.16, type = "sine", bend = 1) {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
+      const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = type;
       o.frequency.setValueAtTime(freq, t0 + at);
-      if (bend !== 1)
-        o.frequency.exponentialRampToValueAtTime(freq * bend, t0 + at + dur);
+      if (bend !== 1) o.frequency.exponentialRampToValueAtTime(freq * bend, t0 + at + dur);
       g.gain.setValueAtTime(0.0001, t0 + at);
       g.gain.exponentialRampToValueAtTime(level, t0 + at + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
@@ -485,14 +469,10 @@
       o.start(t0 + at); o.stop(t0 + at + dur + 0.05);
     }
 
-    /** Filtered noise sweep — the transition between scenes. */
-    function whoosh(at, level = 0.075, dur = 0.85) {
-      const s = ctx.createBufferSource();
-      const f = ctx.createBiquadFilter();
-      const g = ctx.createGain();
+    function whoosh(at, level = 0.07, dur = 0.9) {
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
       s.buffer = noiseBuf;
-      f.type = "bandpass";
-      f.Q.value = 0.9;
+      f.type = "bandpass"; f.Q.value = 0.9;
       f.frequency.setValueAtTime(320, t0 + at);
       f.frequency.exponentialRampToValueAtTime(2400, t0 + at + dur * 0.55);
       f.frequency.exponentialRampToValueAtTime(500, t0 + at + dur);
@@ -503,75 +483,81 @@
       s.start(t0 + at); s.stop(t0 + at + dur + 0.05);
     }
 
-    // --- Harmonic bed. Three movements: settled, unsettled, resolved. ---
-    // D minor feel while the problem is stated…
-    pad(0.0, 146.83, 11.6, 0.055);            // D3
-    pad(0.0, 220.00, 11.6, 0.035);            // A3
-    pad(0.4, 349.23, 11.2, 0.022, "sine");    // F4
-    // …tension as the overdue alert lands…
-    pad(11.3, 174.61, 5.2, 0.055);            // F3
-    pad(11.3, 233.08, 5.2, 0.032);            // Bb3
-    pad(11.6, 415.30, 4.9, 0.020, "sine");    // Ab4 — unsettled
-    // …brightening as the AI answers…
-    pad(16.0, 196.00, 6.0, 0.055);            // G3
-    pad(16.0, 293.66, 6.0, 0.034);            // D4
-    pad(16.3, 392.00, 5.7, 0.022, "sine");    // G4
-    // …resolving on the call to action.
-    pad(21.6, 174.61, 4.8, 0.060);            // F3
-    pad(21.6, 261.63, 4.8, 0.038);            // C4
-    pad(21.9, 349.23, 4.5, 0.028, "sine");    // F4
-    pad(22.2, 440.00, 4.2, 0.018, "sine");    // A4
+    // Harmonic bed: settled → unsettled → brightening → resolved.
+    pad(0.0,  146.83, 18.4, 0.055);           // D3
+    pad(0.0,  220.00, 18.4, 0.034);           // A3
+    pad(0.6,  349.23, 17.6, 0.020, "sine");   // F4
+    pad(18.0, 174.61, 10.4, 0.055);           // F3
+    pad(18.0, 233.08, 10.4, 0.032);           // Bb3
+    pad(18.4, 415.30,  9.8, 0.019, "sine");   // Ab4 — tension
+    pad(28.0, 196.00, 12.4, 0.055);           // G3
+    pad(28.0, 293.66, 12.4, 0.034);           // D4
+    pad(28.4, 392.00, 11.8, 0.021, "sine");   // G4
+    pad(40.0, 174.61,  8.2, 0.060);           // F3
+    pad(40.0, 261.63,  8.2, 0.038);           // C4
+    pad(40.4, 349.23,  7.6, 0.027, "sine");   // F4
+    pad(40.8, 440.00,  7.0, 0.017, "sine");   // A4
 
-    // --- Scene transitions ---
-    whoosh(0.05, 0.09);        // logo arrives
-    whoosh(4.1);               // "don't break down suddenly"
-    whoosh(7.8);               // "slowly — then all at once"
-    whoosh(11.3, 0.085);       // dashboard
-    whoosh(16.0);              // the AI
-    whoosh(21.6, 0.095, 1.0);  // call to action
+    // Scene transitions
+    whoosh(0.05, 0.085);
+    whoosh(7.0);
+    whoosh(10.6);
+    whoosh(18.0, 0.08);
+    whoosh(28.0);
+    whoosh(40.0, 0.09, 1.05);
 
-    // --- Detail hits, matched to the visuals ---
-    blip(1.55, 880, 0.5, 0.10, "sine", 1.5);          // pulse dot lands
-    blip(11.62, 660, 0.14, 0.085, "sine");            // tile 1
-    blip(11.82, 784, 0.14, 0.085, "sine");            // tile 2
-    blip(12.02, 988, 0.16, 0.085, "sine");            // tile 3
-    blip(12.6, 196, 0.55, 0.14, "triangle", 0.82);    // overdue alert — falls
-    blip(12.62, 262, 0.45, 0.06, "sine", 0.85);
+    // Detail hits
+    blip(1.65, 880, 0.5, 0.10, "sine", 1.5);         // pulse dot
+    blip(18.42, 660, 0.14, 0.08, "sine");            // tiles
+    blip(18.67, 784, 0.14, 0.08, "sine");
+    blip(18.92, 988, 0.16, 0.08, "sine");
+    blip(20.0, 196, 0.6, 0.13, "triangle", 0.82);    // overdue — falls
+    blip(20.02, 262, 0.5, 0.055, "sine", 0.85);
+    for (let i = 0; i < 22; i++)                      // typing
+      blip(30.6 + i * 0.12, 2100 + Math.random() * 700, 0.03, 0.022, "square");
+    blip(35.05, 587.33, 0.45, 0.09, "sine", 1.34);   // answer
+    blip(35.13, 880.00, 0.4, 0.05, "sine", 1.25);
+    blip(42.15, 523.25, 1.0, 0.09, "sine");          // resolve
+    blip(42.20, 698.46, 1.0, 0.065, "sine");
+    blip(42.25, 1046.50, 1.1, 0.04, "sine");
 
-    // Typing the question, 16.5s → 18.0s
-    for (let i = 0; i < 24; i++)
-      blip(16.5 + i * 0.062, 2100 + Math.random() * 700, 0.03, 0.028, "square");
-
-    blip(18.62, 587.33, 0.42, 0.10, "sine", 1.34);    // answer appears
-    blip(18.70, 880.00, 0.38, 0.055, "sine", 1.25);
-
-    // Resolve under the logo
-    blip(23.15, 523.25, 0.9, 0.10, "sine");
-    blip(23.20, 698.46, 0.9, 0.07, "sine");
-    blip(23.25, 1046.50, 1.0, 0.045, "sine");
-
-    // Fade the whole thing out with the last scene.
-    master.gain.setValueAtTime(baseLevel, t0 + 24.6);
-    master.gain.exponentialRampToValueAtTime(0.0001, t0 + 26.0);
-    setTimeout(() => ctx.close(), 27000);
+    master.gain.setValueAtTime(baseLevel, t0 + 46.4);
+    master.gain.exponentialRampToValueAtTime(0.0001, t0 + 48.0);
+    setTimeout(() => ctx.close(), 49000);
   }
 
   function start(mode) {
     document.body.classList.add("playing");
     if (mode === "voice" || mode === "music") {
-      try {
-        playScore(mode === "voice" ? 0.45 : 1);
-      } catch (e) {
-        console.warn("audio unavailable", e);
-      }
+      try { playScore(mode === "voice" ? 0.45 : 1); }
+      catch (e) { console.warn("audio unavailable", e); }
     }
     if (mode === "voice") playNarration();
   }
-  document.getElementById("playBtn").onclick = () => start("voice");
-  document.getElementById("musicBtn").onclick = () => start("music");
+  document.getElementById("playBtn").onclick   = () => start("voice");
+  document.getElementById("musicBtn").onclick  = () => start("music");
   document.getElementById("silentBtn").onclick = () => start("silent");
-  document.getElementById("fsBtn").onclick = () =>
+  document.getElementById("fsBtn").onclick     = () =>
     document.documentElement.requestFullscreen?.();
+  addEventListener("pagehide", () => speechSynthesis?.cancel());
+
+  // /promo.html?debug=1 — reports any element wider than the screen.
+  if (params.get("debug")) {
+    addEventListener("load", () => {
+      const vw = document.documentElement.clientWidth;
+      const bad = [...document.querySelectorAll(".scene *")].filter(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && (r.right > vw + 1 || r.left < -1);
+      }).map(el => `${el.className || el.tagName}`);
+      const box = document.createElement("pre");
+      box.style.cssText =
+        "position:fixed;top:0;left:0;z-index:99;background:#000;color:#0f0;" +
+        "font:12px monospace;padding:8px;white-space:pre-wrap;max-width:60vw";
+      box.textContent =
+        `viewport ${vw}\noverflowing: ${bad.length ? bad.join(", ") : "NONE"}`;
+      document.body.appendChild(box);
+    });
+  }
 </script>
 
 </body>
