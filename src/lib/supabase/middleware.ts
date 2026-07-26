@@ -45,7 +45,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isProtected = ["/dashboard", "/vehicles", "/copilot", "/pricing"].some(
+  // /pricing stays public: prospective customers — and payment providers
+  // reviewing the site — must be able to see what is sold and for how much
+  // without creating an account.
+  const isProtected = ["/dashboard", "/vehicles", "/copilot"].some(
     (p) => path === p || path.startsWith(`${p}/`)
   );
   const isAuthPage = path === "/login" || path === "/signup";

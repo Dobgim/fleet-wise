@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFleet } from "@/lib/store";
@@ -50,6 +51,7 @@ function Pricing() {
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
 
+  const signedIn = Boolean(userEmail);
   const current = PLANS[plan];
 
   const choosePlan = async (id: PlanId) => {
@@ -92,14 +94,23 @@ function Pricing() {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 p-4 sm:p-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Plans & billing</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          You are on the <span className="font-semibold">{current.name}</span>{" "}
-          plan · {vehicles.length}
-          {current.maxVehicles !== null && ` / ${current.maxVehicles}`} vehicles
-          ·{" "}
-          {`${formatTokens(budget.remaining)} of ${formatTokens(budget.limit)} AI tokens left today`}
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {signedIn ? "Plans & billing" : "Pricing"}
+        </h1>
+        {signedIn ? (
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            You are on the <span className="font-semibold">{current.name}</span>{" "}
+            plan · {vehicles.length}
+            {current.maxVehicles !== null && ` / ${current.maxVehicles}`} vehicles
+            ·{" "}
+            {`${formatTokens(budget.remaining)} of ${formatTokens(budget.limit)} AI tokens left today`}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Track your vehicles, get warned before a service is due, and ask an
+            AI about your own maintenance records. Start free — no card needed.
+          </p>
+        )}
         {!BILLING_LIVE && (
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             Test mode: switching plans is simulated. Real card payments turn on
@@ -162,25 +173,32 @@ function Pricing() {
                   </li>
                 ))}
               </ul>
-              <button
-                disabled={isCurrent || busy === id}
-                onClick={() => choosePlan(id)}
-                className={`mt-5 rounded-md px-4 py-2 text-sm font-medium ${
-                  isCurrent
-                    ? "cursor-default border border-neutral-300 text-[var(--text-muted)] dark:border-neutral-700"
-                    : "btn-brand"
-                }`}
-              >
-                {isCurrent
-                  ? "Your plan"
-                  : busy === id
-                    ? "Starting…"
-                    : p.pricePerMonth === 0
-                      ? BILLING_LIVE
-                        ? "Cancel to Free"
-                        : "Downgrade to Free"
-                      : `Subscribe — $${p.pricePerMonth}/mo`}
-              </button>
+              {signedIn ? (
+                <button
+                  disabled={isCurrent || busy === id}
+                  onClick={() => choosePlan(id)}
+                  className={`mt-5 rounded-md px-4 py-2 text-sm font-medium ${
+                    isCurrent
+                      ? "cursor-default border border-neutral-300 text-[var(--text-muted)] dark:border-neutral-700"
+                      : "btn-brand"
+                  }`}
+                >
+                  {isCurrent
+                    ? "Your plan"
+                    : busy === id
+                      ? "Starting…"
+                      : p.pricePerMonth === 0
+                        ? "Switch to Free"
+                        : `Subscribe — $${p.pricePerMonth}/mo`}
+                </button>
+              ) : (
+                <Link
+                  href="/signup"
+                  className="btn-brand mt-5 rounded-md px-4 py-2 text-center text-sm font-medium"
+                >
+                  {p.pricePerMonth === 0 ? "Start free" : "Get started"}
+                </Link>
+              )}
             </section>
           );
         })}
