@@ -14,7 +14,11 @@ import { createClient } from "@/lib/supabase/server";
  * budget than a chat question and is metered the same way.
  */
 
-const SCAN_MIN_TOKENS = 3000;
+// A low-detail image plus a short JSON reply costs roughly 1,000–1,400
+// tokens. The reserve sits just above that: high enough that a scan cannot
+// overrun the budget, low enough that a Free user (3,000/day) can still add
+// their one vehicle by photo — the feature that best shows the product off.
+const SCAN_MIN_TOKENS = 1500;
 const MAX_IMAGE_BYTES = 4_500_000; // ~4.5MB after base64 decoding
 
 const bodySchema = z.object({
