@@ -17,7 +17,9 @@ export type SendResult =
   | { ok: true; provider: "resend" | "brevo" }
   | { ok: false; error: string };
 
-const FROM_NAME = "Fleet Wise";
+function fromName(): string {
+  return process.env.EMAIL_FROM_NAME || "Fleet Wise";
+}
 
 function fromAddress(): string {
   return process.env.EMAIL_FROM || "no-reply@fleetwise.app";
@@ -25,6 +27,13 @@ function fromAddress(): string {
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY || process.env.BREVO_API_KEY);
+}
+
+/** Which provider will actually be used — handy when diagnosing delivery. */
+export function activeProvider(): "resend" | "brevo" | null {
+  if (process.env.RESEND_API_KEY) return "resend";
+  if (process.env.BREVO_API_KEY) return "brevo";
+  return null;
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<SendResult> {
@@ -41,13 +50,19 @@ async function sendWithResend(input: SendEmailInput): Promise<SendResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${FROM_NAME} <${fromAddress()}>`,
+      from: `${fromName()} <${fromAddress()}>`,
       to: [input.to],
       subject: input.subject,
       html: input.html,
+      ...(process.env.EMAIL_REPLY_TO && {
+        reply_to: process.env.EMAIL_REPLY_TO,
+      }),
     }),
   });
   if (!res.ok) {
+    // Resend's body names the cause precisely (unverified domain, bad key,
+    // sandbox restriction) — keep it, it is the difference between a
+    // five-minute fix and an afternoon.
     return { ok: false, error: `Resend ${res.status}: ${await safeText(res)}` };
   }
   return { ok: true, provider: "resend" };
@@ -62,7 +77,7 @@ async function sendWithBrevo(input: SendEmailInput): Promise<SendResult> {
       accept: "application/json",
     },
     body: JSON.stringify({
-      sender: { name: FROM_NAME, email: fromAddress() },
+      sender: { name: fromName(), email: fromAddress() },
       to: [{ email: input.to }],
       subject: input.subject,
       htmlContent: input.html,
