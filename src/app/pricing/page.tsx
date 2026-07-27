@@ -5,16 +5,14 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFleet } from "@/lib/store";
 import {
-  approxQuestions,
+  billableVehicles,
   BUSINESS_BREAK_EVEN,
-  formatTokens,
+  FREE_VEHICLES,
   isCheaperOnBusiness,
   monthlyCost,
   PLANS,
   PLAN_ORDER,
   planLabel,
-  TRIAL_DAYS,
-  trialDaysLeft,
   type PaidPlanId,
 } from "@/lib/plans";
 import { openPaddleCheckout, paddleEnabled } from "@/lib/paddle-client";
@@ -45,16 +43,17 @@ function Pricing() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
-  // How many vehicles to buy on Premium. Defaults to the fleet they already
-  // have, since that is what they will need on day one.
-  const [qty, setQty] = useState(1);
+  // Fleet size the calculator is pricing. Starts at what they actually have,
+  // or one past the free allowance for a visitor with nothing yet.
+  const [fleet, setFleet] = useState(FREE_VEHICLES + 1);
   useEffect(() => {
-    setQty(Math.max(1, budget.seats ?? vehicles.length));
-  }, [budget.seats, vehicles.length]);
+    const owned = vehicles.length;
+    const paidFor = FREE_VEHICLES + (budget.seats ?? 0);
+    setFleet(Math.max(FREE_VEHICLES + 1, owned, paidFor));
+  }, [vehicles.length, budget.seats]);
 
   const effective = budget.plan;
   const subscribed = effective === "pro" || effective === "business";
-  const daysLeft = trialDaysLeft(budget.trialEndsAt);
 
   // Returning from checkout. Paddle sends the browser back within about a
   // second, but the plan is granted asynchronously by the webhook — so poll
@@ -89,8 +88,6 @@ function Pricing() {
     };
   }, [params, router, refreshOrg]);
 
-  // The plan can change outside this tab — a webhook after checkout, or a
-  // cancellation in Paddle. Re-read it whenever the page is opened.
   useEffect(() => {
     void refreshOrg();
   }, [refreshOrg]);
@@ -106,7 +103,10 @@ function Pricing() {
 
   const signedIn = Boolean(userEmail);
 
-  /** First purchase: Paddle-hosted checkout. */
+  /** Vehicles to bill for at a given fleet size — the Paddle quantity. */
+  const quantityFor = (id: PaidPlanId, size: number) =>
+    PLANS[id].perVehicle ? Math.max(1, billableVehicles(size)) : 1;
+
   const startCheckout = async (id: PaidPlanId) => {
     setNotice("");
     setError("");
@@ -120,7 +120,7 @@ function Pricing() {
       await openPaddleCheckout({
         priceId,
         orgId,
-        quantity: PLANS[id].perVehicle ? qty : 1,
+        quantity: quantityFor(id, fleet),
         email: userEmail ?? undefined,
         successUrl: `${window.location.origin}/pricing?checkout=success`,
       });
@@ -133,15 +133,15 @@ function Pricing() {
 
   /**
    * Already subscribed: change the existing subscription rather than opening
-   * a second checkout, which would bill them twice. The user sees the exact
-   * prorated amount before anything is charged.
+   * a second checkout, which would bill them twice. The exact prorated amount
+   * is shown and confirmed before anything is charged.
    */
   const changeSubscription = async (id: PaidPlanId) => {
     setNotice("");
     setError("");
     setBusy(id);
     try {
-      const quantity = PLANS[id].perVehicle ? qty : 1;
+      const quantity = quantityFor(id, fleet);
       const pre = await fetch("/api/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,7 +150,6 @@ function Pricing() {
       const preview = await pre.json();
 
       if (pre.status === 409) {
-        // No subscription on record — fall back to a fresh checkout.
         await startCheckout(id);
         return;
       }
@@ -168,10 +167,10 @@ function Pricing() {
           : `You'll be charged ${money.currency} ${money.amount.toFixed(2)} now for the rest of this billing period.`
         : "Your subscription will be updated.";
 
-      const ok = window.confirm(
-        `Switch to ${PLANS[id].name}${PLANS[id].perVehicle ? ` for ${quantity} vehicle${quantity === 1 ? "" : "s"}` : ""}?\n\n${line}`
-      );
-      if (!ok) return;
+      const what = PLANS[id].perVehicle
+        ? `${PLANS[id].name} for ${fleet} vehicles (${quantity} charged)`
+        : PLANS[id].name;
+      if (!window.confirm(`Switch to ${what}?\n\n${line}`)) return;
 
       const res = await fetch("/api/subscription", {
         method: "POST",
@@ -199,31 +198,22 @@ function Pricing() {
     <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          {signedIn ? "Plans & billing" : "Pricing"}
+          {signedIn ? "Plans & billing" : "Simple per-vehicle pricing"}
         </h1>
         {signedIn ? (
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            You are on <span className="font-semibold">{planLabel(effective)}</span>
-            {effective === "trial" && daysLeft > 0 && ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
-            {" · "}
-            {vehicles.length} vehicle{vehicles.length === 1 ? "" : "s"} ·{" "}
-            {`${formatTokens(budget.remaining)} of ${formatTokens(budget.limit)} AI tokens left today`}
+            You are on <span className="font-semibold">{planLabel(effective)}</span> ·{" "}
+            {vehicles.length} vehicle{vehicles.length === 1 ? "" : "s"}
+            {budget.vehicleLimit !== null && ` of ${budget.vehicleLimit} included`}
           </p>
         ) : (
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Track your vehicles, get warned before a service is due, and ask an
-            AI about your own maintenance records. Every account starts with a{" "}
-            {TRIAL_DAYS}-day free trial — no card needed.
+            Your first {FREE_VEHICLES} vehicles are free, forever — no card, no
+            contract. Beyond that it&apos;s $5 per vehicle per month, and you can
+            cancel in one click.
           </p>
         )}
       </div>
-
-      {effective === "none" && signedIn && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-          <b>Your free trial has ended.</b> Your records are safe and still
-          readable, but adding vehicles and asking the AI need a subscription.
-        </div>
-      )}
 
       {notice && (
         <div
@@ -242,18 +232,79 @@ function Pricing() {
         </div>
       )}
 
-      {!BILLING_LIVE && (
-        <p className="text-xs text-[var(--text-muted)]">
-          Checkout is not configured yet — add the Paddle price IDs to enable
-          it.
+      {/* ---- Free tier: stated plainly, not sold ---- */}
+      <section
+        className="rounded-xl border p-5"
+        style={
+          effective === "free"
+            ? { borderColor: "var(--brand)", borderWidth: 2 }
+            : { borderColor: "var(--brand)", background: "var(--brand-soft)" }
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold">
+            Free — up to {FREE_VEHICLES} vehicles
+          </h2>
+          {effective === "free" && (
+            <span className="btn-brand rounded-full px-2.5 py-0.5 text-xs font-medium">
+              Current plan
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          Full dashboard, full service history, AI predictive maintenance and
+          email reminders. No card, no time limit. You only pay when your fleet
+          outgrows {FREE_VEHICLES} vehicles.
         </p>
-      )}
+      </section>
+
+      {/* ---- Calculator ---- */}
+      <section className="rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-5 dark:border-neutral-800">
+        <label
+          htmlFor="fleet"
+          className="block text-sm font-semibold"
+        >
+          How many vehicles do you run?
+        </label>
+        <div className="mt-2 flex flex-wrap items-center gap-4">
+          <input
+            id="fleet"
+            type="number"
+            min={1}
+            max={1000}
+            value={fleet}
+            onChange={(e) =>
+              setFleet(Math.max(1, Math.min(1000, Number(e.target.value) || 1)))
+            }
+            className="w-24 rounded-md border border-neutral-300 bg-transparent px-3 py-2 text-base dark:border-neutral-700"
+          />
+          <p className="text-sm text-[var(--text-secondary)]">
+            {billableVehicles(fleet) === 0 ? (
+              <>
+                <b>Free.</b> Your first {FREE_VEHICLES} vehicles cost nothing.
+              </>
+            ) : (
+              <>
+                {FREE_VEHICLES} free + {billableVehicles(fleet)} ×{" "}
+                ${PLANS.pro.price} ={" "}
+                <b className="text-base">${monthlyCost("pro", fleet)}/month</b>
+              </>
+            )}
+          </p>
+        </div>
+        {isCheaperOnBusiness(fleet) && (
+          <p className="mt-3 text-sm text-[var(--text-secondary)]">
+            At {fleet} vehicles, <b>Business works out cheaper</b> — $
+            {PLANS.business.price}/month flat, unlimited.
+          </p>
+        )}
+      </section>
 
       <div className="grid gap-4 md:grid-cols-2">
         {PLAN_ORDER.map((id) => {
           const p = PLANS[id];
           const isCurrent = effective === id;
-          const cost = monthlyCost(id, qty);
+          const cost = monthlyCost(id, fleet);
           return (
             <section
               key={id}
@@ -279,57 +330,19 @@ function Pricing() {
               <p className="mt-4">
                 <span className="text-3xl font-bold">${p.price}</span>
                 <span className="text-sm text-[var(--text-muted)]">
-                  {p.perVehicle ? " per vehicle / month" : " /month"}
+                  {p.perVehicle ? " per extra vehicle / month" : " /month flat"}
                 </span>
               </p>
-
-              {p.perVehicle && (
-                <div className="mt-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-                  <label
-                    htmlFor="qty"
-                    className="block text-xs font-medium text-[var(--text-secondary)]"
-                  >
-                    How many vehicles?
-                  </label>
-                  <div className="mt-1.5 flex items-center gap-3">
-                    <input
-                      id="qty"
-                      type="number"
-                      min={1}
-                      max={1000}
-                      value={qty}
-                      onChange={(e) =>
-                        setQty(
-                          Math.max(
-                            1,
-                            Math.min(1000, Number(e.target.value) || 1)
-                          )
-                        )
-                      }
-                      className="w-20 rounded-md border border-neutral-300 bg-transparent px-2 py-1.5 text-base sm:text-sm dark:border-neutral-700"
-                    />
-                    <span className="text-sm font-semibold">
-                      = ${cost}/month
-                    </span>
-                  </div>
-                  {isCheaperOnBusiness(qty) && (
-                    <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                      With {qty} vehicles, <b>Business is cheaper</b> at $
-                      {PLANS.business.price}/month — and unlimited.
-                    </p>
-                  )}
-                </div>
-              )}
-
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                {p.perVehicle
+                  ? `${fleet} vehicles → $${cost}/month`
+                  : `Unlimited vehicles → $${cost}/month`}
+              </p>
               {!p.perVehicle && (
-                <p className="mt-3 text-xs text-[var(--text-muted)]">
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Better value from {BUSINESS_BREAK_EVEN} vehicles up.
                 </p>
               )}
-
-              <p className="mt-3 text-xs text-[var(--text-muted)]">
-                ≈ {approxQuestions(p.dailyTokens)} AI questions a day
-              </p>
 
               <ul className="mt-4 flex-1 space-y-2 text-sm">
                 {p.features.map((f) => (
@@ -349,19 +362,19 @@ function Pricing() {
                   {busy === id
                     ? "Working…"
                     : isCurrent && p.perVehicle
-                      ? `Update to ${qty} vehicle${qty === 1 ? "" : "s"}`
+                      ? `Update to ${fleet} vehicles`
                       : isCurrent
                         ? "Your plan"
                         : subscribed
                           ? `Switch to ${p.name}`
-                          : `Subscribe — $${p.perVehicle ? cost : p.price}/mo`}
+                          : `Choose ${p.name} — $${cost}/mo`}
                 </button>
               ) : (
                 <Link
                   href="/signup"
                   className="btn-brand mt-5 rounded-md px-4 py-2 text-center text-sm font-medium"
                 >
-                  Start {TRIAL_DAYS}-day free trial
+                  Start free
                 </Link>
               )}
             </section>
@@ -369,12 +382,14 @@ function Pricing() {
         })}
       </div>
 
-      {subscribed && (
-        <p className="text-sm text-[var(--text-secondary)]">
-          To update your card or cancel, use the manage-subscription link in
-          your Paddle receipt email. Paddle handles billing for Fleet Wise.
-        </p>
-      )}
+      <p className="text-sm text-[var(--text-secondary)]">
+        All plans are monthly with <b>no contract</b> — cancel any time and you
+        keep access until the end of the period you have paid for. AI use is
+        subject to fair use; we will contact you long before it ever becomes an
+        issue.
+        {subscribed &&
+          " To update your card or cancel, use the manage-subscription link in your Paddle receipt email."}
+      </p>
     </main>
   );
 }

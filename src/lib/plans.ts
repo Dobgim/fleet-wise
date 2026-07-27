@@ -1,33 +1,32 @@
 import type { EffectivePlan, PlanId } from "./types";
 
-/** Plans that can actually be bought. "free" is a state, not a product. */
+/** Plans that can be bought. "free" is the default and costs nothing. */
 export type PaidPlanId = Extract<PlanId, "pro" | "business">;
 
 export interface PlanConfig {
   id: PaidPlanId;
   name: string;
-  /** Dollars. Per vehicle per month when `perVehicle`, else per month. */
+  /** Dollars. Per billable vehicle per month when `perVehicle`, else flat. */
   price: number;
   perVehicle: boolean;
-  /** AI tokens per day. Resets at UTC midnight. */
-  dailyTokens: number;
-  /** null = unlimited. On Premium the real cap is the quantity purchased. */
-  maxVehicles: number | null;
   blurb: string;
   features: string[];
 }
 
-/** How long a new garage gets full Premium access without paying. */
-export const TRIAL_DAYS = 14;
+/**
+ * Vehicles included at no charge, on every plan. A Premium customer with five
+ * vehicles pays for two.
+ *
+ * Must match `free_vehicles()` in 0013_per_vehicle_pricing.sql. Postgres is
+ * the authority: the browser can be edited, the database cannot.
+ */
+export const FREE_VEHICLES = 3;
 
 /**
- * Plan limits are the product's cost guardrail. AI usage is metered in
- * tokens — the unit the model provider actually bills — because the cost of
- * a question depends on fleet size, not on the question itself.
- *
- * These values must match `ai_token_limit()` and `vehicle_limit_for_org()`
- * in 0012_trial_and_seats.sql. Postgres is the authority: the browser can be
- * edited, the database cannot.
+ * Pricing follows the category: per vehicle, per month. AI usage is metered
+ * internally as a fair-use backstop but is never quoted as a number — "3,000
+ * tokens a day" means nothing to a fleet manager and makes a business tool
+ * read as a tech demo.
  */
 export const PLANS: Record<PaidPlanId, PlanConfig> = {
   pro: {
@@ -35,14 +34,12 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
     name: "Premium",
     price: 5,
     perVehicle: true,
-    dailyTokens: 30_000,
-    maxVehicles: null, // however many are paid for
-    blurb: "Pay only for the vehicles you actually track.",
+    blurb: "Grow past three vehicles. Pay only for the extras.",
     features: [
-      "$5 per vehicle, per month",
-      "30,000 AI tokens per day",
-      "Add or remove vehicles anytime — the bill follows",
-      "Email maintenance reminders",
+      `First ${FREE_VEHICLES} vehicles free, then $5 per vehicle per month`,
+      "AI predictive maintenance across your whole fleet",
+      "Email reminders 7 days and 3 days before each service",
+      "Add or remove vehicles anytime — no contract, cancel in one click",
     ],
   },
   business: {
@@ -50,34 +47,32 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
     name: "Business",
     price: 20,
     perVehicle: false,
-    dailyTokens: 100_000,
-    maxVehicles: null,
-    blurb: "Unlimited vehicles, one flat price.",
+    blurb: "Flat rate for larger fleets.",
     features: [
-      "Unlimited vehicles",
-      "100,000 AI tokens per day",
-      "AI anomaly predictions",
+      "Unlimited vehicles, one price",
+      "AI predictive maintenance across your whole fleet",
       "Priority support",
+      "No contract, cancel anytime",
     ],
   },
 };
 
 export const PLAN_ORDER: PaidPlanId[] = ["pro", "business"];
 
+/** Vehicles actually charged for: everything past the free allowance. */
+export function billableVehicles(total: number): number {
+  return Math.max(0, total - FREE_VEHICLES);
+}
+
 /** Monthly cost of a plan at a given fleet size. */
 export function monthlyCost(plan: PaidPlanId, vehicles: number): number {
   const cfg = PLANS[plan];
-  return cfg.perVehicle ? cfg.price * Math.max(1, vehicles) : cfg.price;
+  return cfg.perVehicle ? cfg.price * billableVehicles(vehicles) : cfg.price;
 }
 
-/**
- * Premium bills per vehicle, so above a certain fleet size the flat Business
- * price is simply cheaper. Telling people that up front costs a little
- * revenue per customer and buys a lot of trust.
- */
-export const BUSINESS_BREAK_EVEN = Math.ceil(
-  PLANS.business.price / PLANS.pro.price
-);
+/** Fleet size at which the flat Business price beats paying per vehicle. */
+export const BUSINESS_BREAK_EVEN =
+  FREE_VEHICLES + Math.ceil(PLANS.business.price / PLANS.pro.price);
 
 export function isCheaperOnBusiness(vehicles: number): boolean {
   return monthlyCost("pro", vehicles) > PLANS.business.price;
@@ -90,24 +85,9 @@ export function planLabel(plan: EffectivePlan): string {
       return PLANS.pro.name;
     case "business":
       return PLANS.business.name;
-    case "trial":
-      return "Free trial";
     default:
-      return "No plan";
+      return "Free";
   }
-}
-
-/** Whole days left in a trial; 0 once it has run out. */
-export function trialDaysLeft(trialEndsAt: string | null): number {
-  if (!trialEndsAt) return 0;
-  const ms = new Date(trialEndsAt).getTime() - Date.now();
-  return Math.max(0, Math.ceil(ms / 86_400_000));
-}
-
-/** Roughly how many questions a budget buys, for user-facing copy. */
-export function approxQuestions(dailyTokens: number): number {
-  // A typical question costs ~1,200 tokens: fleet context in, short answer out.
-  return Math.max(1, Math.round(dailyTokens / 1200));
 }
 
 export function formatTokens(n: number): string {

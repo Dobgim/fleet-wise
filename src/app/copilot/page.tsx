@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { askCopilot } from "@/lib/copilot";
-import { formatTokens, planLabel } from "@/lib/plans";
+import { planLabel } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { AiBudget, ServiceRecord, Vehicle } from "@/lib/types";
 
@@ -164,13 +164,20 @@ export default function CopilotPage() {
     <main className="mx-auto flex h-[calc(100dvh-62px)] w-full max-w-3xl flex-col p-4 sm:p-6">
       {quotaExhausted && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-          You&apos;ve used today&apos;s {formatTokens(budget.limit)}{" "}
-          AI tokens on {planLabel(budget.plan)}. They refill in{" "}
-          <b>{resetsIn(budget.resets_at)}</b>, or{" "}
-          <Link href="/pricing" className="font-semibold underline">
-            upgrade for a bigger daily allowance
-          </Link>
-          .
+          You&apos;ve reached today&apos;s fair-use limit for AI questions on{" "}
+          {planLabel(budget.plan)}. It resets in{" "}
+          <b>{resetsIn(budget.resets_at)}</b>
+          {budget.plan === "free" ? (
+            <>
+              , or{" "}
+              <Link href="/pricing" className="font-semibold underline">
+                move to a paid plan
+              </Link>{" "}
+              for a much higher ceiling.
+            </>
+          ) : (
+            "."
+          )}
         </div>
       )}
 
@@ -248,7 +255,7 @@ export default function CopilotPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={
-            quotaExhausted ? "Daily tokens used up" : "Ask anything"
+            quotaExhausted ? "Daily limit reached" : "Ask anything"
           }
           disabled={quotaExhausted}
           className="min-w-0 flex-1 border-0 bg-transparent py-1.5 text-base outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50 sm:text-[15px]"
@@ -273,12 +280,6 @@ export default function CopilotPage() {
         </button>
       </form>
 
-      {budget.limit > 0 && (
-        <p className="pt-2 text-center text-[11px] text-[var(--text-muted)]">
-          {formatTokens(budget.remaining)} of {formatTokens(budget.limit)} daily
-          AI tokens left · refills in {resetsIn(budget.resets_at)}
-        </p>
-      )}
     </main>
   );
 }

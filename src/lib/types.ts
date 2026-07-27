@@ -40,7 +40,7 @@ export type PlanId = "free" | "pro" | "business";
  * What the organization is entitled to right now, decided by Postgres in
  * `effective_plan()`. This — not PlanId — is what the UI should reason about.
  */
-export type EffectivePlan = "none" | "trial" | "pro" | "business";
+export type EffectivePlan = "free" | "pro" | "business";
 
 /** Today's AI token budget for an organization, as reported by Postgres. */
 export interface AiBudget {
@@ -50,14 +50,14 @@ export interface AiBudget {
   requests: number;
   /** ISO timestamp of the next UTC midnight, when the budget refills. */
   resets_at: string;
-  /** Entitlement in force, including trial and expiry. */
+  /** Entitlement in force. */
   plan: EffectivePlan;
-  /** null = unlimited (Business). 0 = trial over and not subscribed. */
+  /** Total vehicles allowed; null = unlimited (Business). */
   vehicleLimit: number | null;
-  /** Premium only: vehicles currently paid for. */
+  /** Vehicles included at no charge on every plan. */
+  freeVehicles: number;
+  /** Premium only: vehicles paid for, i.e. beyond the free allowance. */
   seats: number | null;
-  /** ISO timestamp the trial ends, or null. */
-  trialEndsAt: string | null;
 }
 
 export interface FleetData {

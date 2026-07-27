@@ -1,4 +1,4 @@
-import { formatTokens, monthlyCost, PLANS, type PaidPlanId } from "../plans";
+import { FREE_VEHICLES, PLANS, type PaidPlanId } from "../plans";
 
 /**
  * Sent by us when a subscription becomes active.
@@ -24,11 +24,11 @@ export function buildSubscriptionEmail(params: {
 
   const perks = [
     cfg.perVehicle
-      ? `${qty} vehicle${qty === 1 ? "" : "s"} at $${cfg.price} each — $${monthlyCost(plan, qty)} a month`
+      ? `${FREE_VEHICLES + qty} vehicles — the first ${FREE_VEHICLES} free, ${qty} at $${cfg.price} each`
       : "Unlimited vehicles",
-    `${formatTokens(cfg.dailyTokens)} AI tokens every day`,
+    "AI predictive maintenance across your whole fleet",
     "Maintenance reminders a week and three days before each service",
-    "AI anomaly detection across your fleet",
+    "No contract — change or cancel any time",
   ];
 
   return {

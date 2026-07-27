@@ -1,15 +1,24 @@
 # Paddle setup for the new pricing
 
-New pricing, effective with migration `0012_trial_and_seats.sql`:
+New pricing, effective with migration `0013_per_vehicle_pricing.sql`:
 
-| Plan | Price | Vehicles | AI tokens/day |
-|---|---|---|---|
-| **Free trial** | $0 for 14 days, no card | 20 | 30,000 |
-| **Premium** | **$5 per vehicle** / month | as many as paid for | 30,000 |
-| **Business** | **$20** / month | unlimited | 100,000 |
+| Plan | Price | Vehicles |
+|---|---|---|
+| **Free** | $0 forever, no card | first **3** |
+| **Premium** | **$5 per vehicle / month** beyond the first 3 | unlimited |
+| **Business** | **$20 / month** flat | unlimited |
 
-There is no free plan. When the trial ends, records stay readable but adding
-vehicles and using the AI stop until a plan is bought.
+A fleet of 5 pays for 2 vehicles = $10/month. Business becomes cheaper at 8
+vehicles and up.
+
+**AI token numbers are no longer shown anywhere.** They still exist as a
+fair-use backstop against runaway automated use, but "3,000 tokens a day"
+means nothing to a fleet manager pricing you against $5/vehicle competitors,
+and made a business tool read as a tech demo. The ceilings were raised so
+ordinary use never meets them.
+
+The 14-day trial is gone — a permanent 3-vehicle free tier does the same job
+without a cliff.
 
 ---
 
@@ -53,16 +62,16 @@ NEXT_PUBLIC_PADDLE_PRICE_BUSINESS=pri_...   # the new $20 flat price
 Redeploy afterwards — these are `NEXT_PUBLIC_`, so they are baked in at build
 time and a saved variable alone changes nothing.
 
-## 4 · Run the migration
+## 4 · Run the migrations
 
-Supabase → SQL Editor → `supabase/migrations/0012_trial_and_seats.sql` → Run.
+Supabase → SQL Editor → run `0012_trial_and_seats.sql`, then
+`0013_per_vehicle_pricing.sql`. 0012 creates the `seats` column and the
+enforcement trigger; 0013 sets the current pricing on top.
 
-This adds `trial_ends_at` and `seats` to `organizations`, rewrites the limit
-functions, and adds a **trigger that enforces the vehicle cap in the
-database**. That trigger matters more than it used to: with per-vehicle
-pricing, an unenforced cap is unpaid revenue.
-
-Existing organizations get a fresh 14-day trial from the moment you run it.
+Together they add `seats` to `organizations`, rewrite the limit functions, and
+add a **trigger that enforces the vehicle cap in the database**. That trigger
+matters more than it used to: with per-vehicle pricing, an unenforced cap is
+unpaid revenue.
 
 ---
 
@@ -98,11 +107,12 @@ paid for, and the trigger enforces exactly that.
 
 Use Paddle's sandbox card `4242 4242 4242 4242`, any future expiry, any CVC.
 
-1. Sign up → banner shows the trial, 20 vehicles allowed.
-2. Buy Premium with quantity 2 → `organizations.seats` becomes 2.
-3. Add a 3rd vehicle → prompt shows the prorated amount → confirm → `seats`
-   becomes 3 and the vehicle saves.
-4. Switch to Business → prompt shows the difference → `seats` becomes null,
+1. Sign up → Free plan, 3 vehicles allowed, no card asked for.
+2. Add 3 vehicles → the 4th is refused with a link to pricing.
+3. Buy Premium for a 5-vehicle fleet → Paddle quantity **2**, charge $10 →
+   `organizations.seats` becomes 2 and `vehicle_limit_for_org` returns 5.
+4. Add a 6th vehicle → prompt shows the prorated amount → confirm → `seats`
+   becomes 3, the vehicle saves.
+5. Switch to Business → prompt shows the difference → `seats` becomes null,
    vehicles unlimited.
-5. In Supabase, set `trial_ends_at` to a past date on a trial org and confirm
-   the app locks to read-only.
+6. Confirm no token counts appear anywhere in the interface.

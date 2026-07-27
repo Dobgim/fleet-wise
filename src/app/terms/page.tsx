@@ -83,10 +83,10 @@ export default function TermsPage() {
 
       <Section heading="6. Usage limits">
         <p>
-          Each plan includes a daily allowance of AI usage, measured in tokens,
-          and a limit on the number of vehicles. Allowances reset daily. We
-          apply these limits to keep the service sustainable, and we may adjust
-          them with notice.
+          AI features are subject to fair use. There is a generous daily
+          ceiling to stop runaway automated use; ordinary fleet management
+          will not reach it, and we will contact you before it ever becomes a
+          problem rather than cutting you off without warning.
         </p>
       </Section>
 

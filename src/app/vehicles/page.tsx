@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { formatMoney } from "@/lib/insights";
-import { PLANS, planLabel } from "@/lib/plans";
+import { billableVehicles, PLANS } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { Vehicle } from "@/lib/types";
 
@@ -81,7 +81,8 @@ export default function VehiclesPage() {
     setError("");
     setSeatBusy(true);
     try {
-      const quantity = (budget.seats ?? vehicles.length) + 1;
+      // seats counts vehicles PAID FOR, i.e. beyond the free allowance.
+      const quantity = (budget.seats ?? billableVehicles(vehicles.length)) + 1;
       const pre = await fetch("/api/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -101,7 +102,7 @@ export default function VehiclesPage() {
         | { amount: number; currency: string; negative: boolean }
         | null;
       const line = money
-        ? `You'll be charged ${money.currency} ${money.amount.toFixed(2)} now for the rest of this billing period, then $${quantity * PLANS.pro.price}/month.`
+        ? `You'll be charged ${money.currency} ${money.amount.toFixed(2)} now for the rest of this billing period, then $${quantity * PLANS.pro.price}/month for ${quantity} paid vehicle${quantity === 1 ? "" : "s"}.`
         : `Your plan will move to ${quantity} vehicles.`;
       if (!window.confirm(`Add one vehicle to your plan?\n\n${line}`)) return;
 
@@ -128,8 +129,8 @@ export default function VehiclesPage() {
     if (!editingId && !canAddVehicle) {
       setError(
         budget.plan === "pro"
-          ? `You're paying for ${budget.seats ?? 0} vehicle${budget.seats === 1 ? "" : "s"}. Add one to your plan to make room.`
-          : `Your ${planLabel(budget.plan)} allows ${budget.vehicleLimit} vehicle${budget.vehicleLimit === 1 ? "" : "s"}.`
+          ? `Your plan covers ${budget.vehicleLimit} vehicles. Add one to make room.`
+          : `Free covers ${budget.freeVehicles} vehicles — add a paid vehicle to go further.`
       );
       return;
     }
@@ -271,23 +272,15 @@ export default function VehiclesPage() {
                   : `Add a vehicle to my plan (+$${PLANS.pro.price}/mo)`}
               </button>
             </>
-          ) : budget.plan === "none" ? (
-            <>
-              Your free trial has ended, so no new vehicles can be added. Your
-              existing records are safe.{" "}
-              <Link href="/pricing" className="font-semibold underline">
-                Choose a plan
-              </Link>{" "}
-              to carry on.
-            </>
           ) : (
             <>
-              You&apos;ve reached the {budget.vehicleLimit}-vehicle limit of{" "}
-              {planLabel(budget.plan)}.{" "}
+              You&apos;ve filled all {budget.freeVehicles} free vehicles. Beyond
+              that it&apos;s ${PLANS.pro.price} per vehicle per month, with no
+              contract.{" "}
               <Link href="/pricing" className="font-semibold underline">
-                Upgrade
-              </Link>{" "}
-              to add more vehicles.
+                See pricing
+              </Link>
+              .
             </>
           )}
         </div>

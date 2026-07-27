@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "./supabase/client";
+import { FREE_VEHICLES } from "./plans";
 import { buildSeedData } from "./seed";
 
 import type {
@@ -70,10 +71,10 @@ function emptyBudget(limit = 0): AiBudget {
     remaining: limit,
     requests: 0,
     resets_at: "",
-    plan: "none",
-    vehicleLimit: 0,
+    plan: "free",
+    vehicleLimit: FREE_VEHICLES,
+    freeVehicles: FREE_VEHICLES,
     seats: null,
-    trialEndsAt: null,
   };
 }
 
