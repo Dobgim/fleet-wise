@@ -12,7 +12,7 @@ import {
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "./supabase/client";
 import { buildSeedData } from "./seed";
-import { PLANS } from "./plans";
+
 import type {
   AiBudget,
   PlanId,
@@ -41,7 +41,6 @@ interface FleetContextValue {
   /** Today's AI token budget, from the database. */
   budget: AiBudget;
   canAddVehicle: boolean;
-  setPlan: (plan: PlanId) => void;
   /** Apply the authoritative budget returned by /api/copilot. */
   applyBudget: (b: AiBudget) => void;
   refreshBudget: () => Promise<void>;
@@ -71,6 +70,10 @@ function emptyBudget(limit = 0): AiBudget {
     remaining: limit,
     requests: 0,
     resets_at: "",
+    plan: "none",
+    vehicleLimit: 0,
+    seats: null,
+    trialEndsAt: null,
   };
 }
 
@@ -269,7 +272,17 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           mileage: vehicle.mileage,
         })
         .then(({ error }) => {
-          if (error) fail("Could not save vehicle", error.message, orgId);
+          if (!error) return;
+          // The database enforces the vehicle cap (trigger in 0012), so this
+          // fires if the browser's copy of the limit was stale — or if
+          // someone tried to bypass the UI entirely.
+          fail(
+            "Could not save vehicle",
+            error.message.includes("vehicle_limit_reached")
+              ? "You've used all the vehicles your plan covers. Add one on the Pricing page to make room."
+              : error.message,
+            orgId
+          );
         });
     },
     [supabase, orgId, fail]
@@ -378,24 +391,6 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     [supabase, orgId, fail]
   );
 
-  const setPlan = useCallback(
-    (next: PlanId) => {
-      if (!orgId) return;
-      setPlanState(next);
-      // Simulated checkout: the plan column is not writable by users, so this
-      // goes through a database function. Replaced by the payment provider's
-      // webhook when real billing lands.
-      void supabase
-        .rpc("set_plan_simulated", { p_plan: next })
-        .then(({ error }) => {
-          if (error) alert(`Could not change plan: ${error.message}`);
-          else void refreshBudget(); // new plan, new allowance
-        });
-    },
-    [supabase, orgId, refreshBudget]
-  );
-
-
   const clearAllData = useCallback(() => {
     if (!orgId) return;
     setVehicles([]);
@@ -475,9 +470,12 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     await clerkSignOut();
   }, [clerkSignOut]);
 
-  const planCfg = PLANS[plan];
+  // Postgres decides entitlement (effective_plan + vehicle_limit_for_org):
+  // it accounts for the trial, its expiry, and the vehicles actually paid
+  // for. A trigger enforces the same number, so this is only about showing
+  // the right thing before the user tries.
   const canAddVehicle =
-    planCfg.maxVehicles === null || vehicles.length < planCfg.maxVehicles;
+    budget.vehicleLimit === null || vehicles.length < budget.vehicleLimit;
 
   return (
     <FleetContext.Provider
@@ -493,7 +491,6 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         plan,
         budget,
         canAddVehicle,
-        setPlan,
         applyBudget,
         refreshBudget,
         refreshOrg,

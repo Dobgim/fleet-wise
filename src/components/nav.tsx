@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { PLANS } from "@/lib/plans";
+import { planLabel } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import { Logo, Wordmark } from "./logo";
 
@@ -18,7 +18,7 @@ const LINKS = [
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { plan, userEmail, orgName, signOut } = useFleet();
+  const { budget, userEmail, orgName, signOut } = useFleet();
   const [open, setOpen] = useState(false);
 
   // Close the drawer on navigation; lock page scroll while it's open
@@ -71,7 +71,7 @@ export function Nav() {
             href="/pricing"
             className="rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] dark:border-neutral-700"
           >
-            {PLANS[plan].name}
+            {planLabel(budget.plan)}
           </Link>
         ) : (
           <Link
@@ -124,7 +124,7 @@ export function Nav() {
                 href="/pricing"
                 className="rounded-full border border-neutral-300 px-2.5 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
               >
-                {PLANS[plan].name} plan
+                {planLabel(budget.plan)}
               </Link>
               <span
                 className="max-w-45 truncate text-xs text-[var(--text-muted)]"
@@ -223,7 +223,7 @@ export function Nav() {
                     {orgName ?? userEmail}
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                    {PLANS[plan].name} plan
+                    {planLabel(budget.plan)}
                   </p>
                   <div className="mt-3 flex gap-2">
                     <Link

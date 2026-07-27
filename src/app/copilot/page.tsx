@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { askCopilot } from "@/lib/copilot";
-import { formatTokens, PLANS } from "@/lib/plans";
+import { formatTokens, planLabel } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { AiBudget, ServiceRecord, Vehicle } from "@/lib/types";
 
@@ -76,7 +76,7 @@ function buildSuggestions(
 }
 
 export default function CopilotPage() {
-  const { ready, vehicles, records, plan, budget, applyBudget, refreshBudget } =
+  const { ready, vehicles, records, budget, applyBudget, refreshBudget } =
     useFleet();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -164,8 +164,8 @@ export default function CopilotPage() {
     <main className="mx-auto flex h-[calc(100dvh-62px)] w-full max-w-3xl flex-col p-4 sm:p-6">
       {quotaExhausted && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-          You&apos;ve used today&apos;s {formatTokens(PLANS[plan].dailyTokens)}{" "}
-          AI tokens on the {PLANS[plan].name} plan. They refill in{" "}
+          You&apos;ve used today&apos;s {formatTokens(budget.limit)}{" "}
+          AI tokens on {planLabel(budget.plan)}. They refill in{" "}
           <b>{resetsIn(budget.resets_at)}</b>, or{" "}
           <Link href="/pricing" className="font-semibold underline">
             upgrade for a bigger daily allowance

@@ -44,8 +44,17 @@ export default function TermsPage() {
 
       <Section heading="4. Plans, billing and payment">
         <p>
-          Fleet Wise offers a free plan and paid plans. Paid plans are billed
-          monthly in advance and renew automatically until cancelled.
+          Fleet Wise offers a 14-day free trial, after which a paid plan is
+          required to add vehicles or use the AI. Existing records stay
+          readable either way. Paid plans are billed monthly in advance and
+          renew automatically until cancelled.
+        </p>
+        <p>
+          The Premium plan is billed <strong>per vehicle</strong>. Adding a
+          vehicle to your subscription increases the monthly price and is
+          charged pro-rata for the remainder of the current billing period; we
+          show the exact amount and ask you to confirm before any change is
+          made. Removing vehicles reduces the price from the next renewal.
         </p>
         <p>
           <strong>Payments are processed by Paddle</strong>, which acts as the

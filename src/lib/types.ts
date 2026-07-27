@@ -29,7 +29,18 @@ export interface ServiceRecord {
   createdAt: string; // ISO
 }
 
+/**
+ * What is stored in `organizations.plan`. "free" is no longer a product —
+ * it means "not subscribed", which during the trial window still grants
+ * Premium-level access.
+ */
 export type PlanId = "free" | "pro" | "business";
+
+/**
+ * What the organization is entitled to right now, decided by Postgres in
+ * `effective_plan()`. This — not PlanId — is what the UI should reason about.
+ */
+export type EffectivePlan = "none" | "trial" | "pro" | "business";
 
 /** Today's AI token budget for an organization, as reported by Postgres. */
 export interface AiBudget {
@@ -39,6 +50,14 @@ export interface AiBudget {
   requests: number;
   /** ISO timestamp of the next UTC midnight, when the budget refills. */
   resets_at: string;
+  /** Entitlement in force, including trial and expiry. */
+  plan: EffectivePlan;
+  /** null = unlimited (Business). 0 = trial over and not subscribed. */
+  vehicleLimit: number | null;
+  /** Premium only: vehicles currently paid for. */
+  seats: number | null;
+  /** ISO timestamp the trial ends, or null. */
+  trialEndsAt: string | null;
 }
 
 export interface FleetData {

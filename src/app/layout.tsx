@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { FleetProvider } from "@/lib/store";
 import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
+import { TrialBanner } from "@/components/trial-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,6 +39,7 @@ export default function RootLayout({
         <ClerkProvider>
           <FleetProvider>
             <Nav />
+            <TrialBanner />
             {children}
             <Footer />
           </FleetProvider>

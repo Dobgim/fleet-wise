@@ -12,9 +12,9 @@ export default function RefundsPage() {
     <LegalPage title="Refund Policy" updated="26 July 2026">
       <Section heading="Try before you pay">
         <p>
-          Fleet Wise has a free plan that needs no card. We would rather you
-          used it first and upgraded only when the paid limits are worth it
-          to you.
+          Every Fleet Wise account starts with a <strong>14-day free trial</strong>{" "}
+          that needs no card and charges nothing when it ends. We would rather
+          you used it first and subscribed only if the product earns it.
         </p>
       </Section>
 
@@ -31,8 +31,9 @@ export default function RefundsPage() {
           You can cancel at any time and will not be billed again. Access
           continues until the end of the period you have already paid for. We
           do not automatically refund part-used months, but if you were charged
-          by mistake — a duplicate payment, a renewal you had cancelled, or a
-          plan you never used — write to us and we will put it right.
+          by mistake — a duplicate payment, a renewal you had cancelled, a
+          plan you never used, or vehicles added to your subscription that you
+          did not intend — write to us and we will put it right.
         </p>
       </Section>
 

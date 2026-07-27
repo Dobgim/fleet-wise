@@ -80,12 +80,16 @@ export function loadPaddle(): Promise<PaddleGlobal> {
 export async function openPaddleCheckout(params: {
   priceId: string;
   orgId: string;
+  /** Vehicles to bill for on a per-vehicle price. Flat plans stay at 1. */
+  quantity?: number;
   email?: string;
   successUrl?: string;
 }) {
   const paddle = await loadPaddle();
   paddle.Checkout.open({
-    items: [{ priceId: params.priceId, quantity: 1 }],
+    items: [
+      { priceId: params.priceId, quantity: Math.max(1, params.quantity ?? 1) },
+    ],
     // Read back by the webhook to decide which garage just paid.
     customData: { org_id: params.orgId },
     ...(params.email && { customer: { email: params.email } }),

@@ -1,5 +1,4 @@
-import { formatTokens, PLANS } from "../plans";
-import type { PlanId } from "../types";
+import { formatTokens, monthlyCost, PLANS, type PaidPlanId } from "../plans";
 
 /**
  * Sent by us when a subscription becomes active.
@@ -10,20 +9,23 @@ import type { PlanId } from "../types";
  */
 export function buildSubscriptionEmail(params: {
   garageName: string;
-  plan: PlanId;
+  plan: PaidPlanId;
+  /** Premium only: vehicles paid for. */
+  seats?: number | null;
   siteUrl: string;
   logoUrl: string;
 }): { subject: string; html: string } {
-  const { garageName, plan, siteUrl, logoUrl } = params;
+  const { garageName, plan, seats, siteUrl, logoUrl } = params;
   const cfg = PLANS[plan];
+  const qty = Math.max(1, seats ?? 1);
 
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const perks = [
-    cfg.maxVehicles === null
-      ? "Unlimited vehicles"
-      : `Up to ${cfg.maxVehicles} vehicles`,
+    cfg.perVehicle
+      ? `${qty} vehicle${qty === 1 ? "" : "s"} at $${cfg.price} each — $${monthlyCost(plan, qty)} a month`
+      : "Unlimited vehicles",
     `${formatTokens(cfg.dailyTokens)} AI tokens every day`,
     "Maintenance reminders a week and three days before each service",
     "AI anomaly detection across your fleet",

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { formatMoney } from "@/lib/insights";
-import { PLANS } from "@/lib/plans";
+import { PLANS, planLabel } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { Vehicle } from "@/lib/types";
 
@@ -38,8 +38,9 @@ export default function VehiclesPage() {
     ready,
     vehicles,
     records,
-    plan,
+    budget,
     canAddVehicle,
+    refreshOrg,
     addVehicle,
     updateVehicle,
     deleteVehicle,
@@ -48,6 +49,7 @@ export default function VehiclesPage() {
     applyBudget,
   } = useFleet();
   const [form, setForm] = useState(EMPTY);
+  const [seatBusy, setSeatBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -68,11 +70,66 @@ export default function VehiclesPage() {
     });
   };
 
+  /**
+   * Buy one more vehicle on Premium.
+   *
+   * Two calls on purpose: the first prices the change, the second applies it.
+   * Nobody should discover a charge on their statement that they never
+   * agreed to — so the exact prorated amount is shown and confirmed first.
+   */
+  const addSeat = async () => {
+    setError("");
+    setSeatBusy(true);
+    try {
+      const quantity = (budget.seats ?? vehicles.length) + 1;
+      const pre = await fetch("/api/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro", quantity, preview: true }),
+      });
+      const preview = await pre.json();
+      if (!pre.ok) {
+        setError(
+          pre.status === 409
+            ? "No active subscription found. Choose a plan on the Pricing page."
+            : (preview.error ?? "Couldn't price that change.")
+        );
+        return;
+      }
+
+      const money = preview.charge as
+        | { amount: number; currency: string; negative: boolean }
+        | null;
+      const line = money
+        ? `You'll be charged ${money.currency} ${money.amount.toFixed(2)} now for the rest of this billing period, then $${quantity * PLANS.pro.price}/month.`
+        : `Your plan will move to ${quantity} vehicles.`;
+      if (!window.confirm(`Add one vehicle to your plan?\n\n${line}`)) return;
+
+      const res = await fetch("/api/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro", quantity }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Couldn't update your subscription.");
+        return;
+      }
+      await refreshOrg();
+    } catch {
+      setError("Couldn't update your subscription. Nothing was charged.");
+    } finally {
+      setSeatBusy(false);
+    }
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!editingId && !canAddVehicle) {
       setError(
-        `The ${PLANS[plan].name} plan is limited to ${PLANS[plan].maxVehicles} vehicles — upgrade to add more.`
+        budget.plan === "pro"
+          ? `You're paying for ${budget.seats ?? 0} vehicle${budget.seats === 1 ? "" : "s"}. Add one to your plan to make room.`
+          : `Your ${planLabel(budget.plan)} allows ${budget.vehicleLimit} vehicle${budget.vehicleLimit === 1 ? "" : "s"}.`
       );
       return;
     }
@@ -194,12 +251,45 @@ export default function VehiclesPage() {
 
       {!canAddVehicle && !editingId && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
-          You&apos;ve reached the {PLANS[plan].maxVehicles}-vehicle limit of the{" "}
-          {PLANS[plan].name} plan.{" "}
-          <Link href="/pricing" className="font-semibold underline">
-            Upgrade
-          </Link>{" "}
-          to add more vehicles.
+          {budget.plan === "pro" ? (
+            <>
+              <p>
+                You&apos;re paying for{" "}
+                <b>
+                  {budget.seats} vehicle{budget.seats === 1 ? "" : "s"}
+                </b>
+                . Adding another costs ${PLANS.pro.price}/month more, charged
+                pro-rata for the rest of this billing period.
+              </p>
+              <button
+                onClick={addSeat}
+                disabled={seatBusy}
+                className="btn-brand mt-3 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                {seatBusy
+                  ? "Updating…"
+                  : `Add a vehicle to my plan (+$${PLANS.pro.price}/mo)`}
+              </button>
+            </>
+          ) : budget.plan === "none" ? (
+            <>
+              Your free trial has ended, so no new vehicles can be added. Your
+              existing records are safe.{" "}
+              <Link href="/pricing" className="font-semibold underline">
+                Choose a plan
+              </Link>{" "}
+              to carry on.
+            </>
+          ) : (
+            <>
+              You&apos;ve reached the {budget.vehicleLimit}-vehicle limit of{" "}
+              {planLabel(budget.plan)}.{" "}
+              <Link href="/pricing" className="font-semibold underline">
+                Upgrade
+              </Link>{" "}
+              to add more vehicles.
+            </>
+          )}
         </div>
       )}
 

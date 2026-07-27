@@ -45,7 +45,7 @@ interface Subscriptionish {
   id: string;
   status: string;
   customData?: Record<string, unknown> | null;
-  items?: { price?: { id?: string } | null }[];
+  items?: { price?: { id?: string } | null; quantity?: number }[];
   currentBillingPeriod?: { endsAt?: string | null } | null;
 }
 
@@ -68,6 +68,13 @@ async function applySubscription(sub: Subscriptionish) {
   const active = sub.status === "active" || sub.status === "trialing";
   const plan: PlanId = active && paidPlan ? paidPlan : "free";
 
+  // Premium is billed per vehicle, so the Paddle quantity *is* the vehicle
+  // allowance. Paddle is the authority here: whatever was actually paid for
+  // is what the database enforces, however the change was made — our own
+  // update endpoint, a Paddle-hosted portal, or support acting manually.
+  const seats =
+    plan === "pro" ? Math.max(1, sub.items?.[0]?.quantity ?? 1) : null;
+
   // Read the plan before changing it, so the welcome email fires on a real
   // upgrade only — not on every renewal or status tick Paddle sends.
   const { data: before } = await admin
@@ -77,7 +84,7 @@ async function applySubscription(sub: Subscriptionish) {
     .maybeSingle();
   const upgraded = plan !== "free" && before?.plan !== plan;
 
-  await admin.from("organizations").update({ plan }).eq("id", orgId);
+  await admin.from("organizations").update({ plan, seats }).eq("id", orgId);
 
   if (upgraded && emailConfigured()) {
     try {
@@ -88,7 +95,9 @@ async function applySubscription(sub: Subscriptionish) {
           "https://fleet-wise-delta.vercel.app";
         const { subject, html } = buildSubscriptionEmail({
           garageName: before?.name ?? "your garage",
-          plan,
+          // `upgraded` is only true for a paid plan, so this narrowing holds.
+          plan: plan as "pro" | "business",
+          seats,
           siteUrl,
           logoUrl: `${siteUrl}/logo.png`,
         });
