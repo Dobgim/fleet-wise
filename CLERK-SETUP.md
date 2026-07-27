@@ -37,15 +37,20 @@ NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard
 ```
 
 Use the `pk_test_`/`sk_test_` keys while testing. Clerk gives you separate
-production keys when you add a custom domain — swap them then.
+production keys when you add a custom domain — swap them then, **and update
+the Clerk domain in Supabase (step 3) at the same time**. A production
+instance has a different domain (`clerk.yourdomain.com`); if Supabase is left
+pointing at the development one it will reject every signed-in user.
 
 ## 3 · Connect Clerk to Supabase
 
 This is the step that makes Supabase accept Clerk's tokens.
 
-1. **Clerk dashboard → Integrations → Supabase → Activate.**
-   Copy the **Clerk domain** it shows you (looks like
-   `https://your-app-12.clerk.accounts.dev`).
+1. Go straight to **https://dashboard.clerk.com/setup/supabase**, pick your
+   Fleet Wise instance, then click **Activate Supabase integration**.
+   The **Clerk domain** is only revealed *after* you activate — it looks like
+   `https://verb-noun-42.clerk.accounts.dev`. Copy it including `https://`.
+   (Same value as **Frontend API URL** on the API keys page.)
 2. **Supabase dashboard → Authentication → Sign In / Providers → Add provider
    → Clerk.** Paste the domain. Save.
 
