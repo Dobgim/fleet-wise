@@ -45,8 +45,14 @@ Paddle → **Catalog → Products → Fleet Wise Premium → New price**.
 | **Quantity** | Minimum **1**, maximum **1000** |
 
 The quantity range is what makes per-vehicle billing work: the checkout sends
-the number of vehicles as the quantity, and Paddle multiplies. If the maximum
-is left at 1, every customer is stuck on one vehicle.
+the number of **billable** vehicles as the quantity, and Paddle multiplies.
+Paddle defaults this to **1–100**, so raise the maximum — otherwise a fleet of
+more than 101 vehicles cannot check out.
+
+**Quantity = total vehicles − 1.** The free vehicle is subtracted by this app
+before the number ever reaches Paddle, so Paddle only ever sees what is
+actually charged for. `organizations.seats` stores the same number: a
+5-vehicle fleet buys quantity 4 and pays $20.
 
 Archive the old flat $20 Premium price.
 
