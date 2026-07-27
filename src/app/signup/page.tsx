@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { friendlyAuthError } from "@/lib/auth-errors";
+import { PasswordInput } from "@/components/password-input";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -117,13 +118,11 @@ export default function SignupPage() {
           <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Password
           </label>
-          <input
-            className={input}
-            type="password"
-            required
-            placeholder="At least 8 characters"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
           />
         </div>
         {error && (

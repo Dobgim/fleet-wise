@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { friendlyAuthError } from "@/lib/auth-errors";
+import { PasswordInput } from "@/components/password-input";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -70,13 +71,11 @@ export default function LoginPage() {
           <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
             Password
           </label>
-          <input
-            className={input}
-            type="password"
-            required
-            placeholder="••••••••"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
+            placeholder="••••••••"
+            autoComplete="current-password"
           />
         </div>
         {error && (
