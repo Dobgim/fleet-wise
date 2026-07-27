@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { MFA_REQUIRED, needsMfaChallenge as mfaPending } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -74,6 +75,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  if (await mfaPending(supabase)) {
+    return NextResponse.json({ error: MFA_REQUIRED }, { status: 403 });
   }
 
   const { data: budgetData, error: budgetError } =

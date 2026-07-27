@@ -48,7 +48,7 @@ export async function updateSession(request: NextRequest) {
   // /pricing stays public: prospective customers — and payment providers
   // reviewing the site — must be able to see what is sold and for how much
   // without creating an account.
-  const isProtected = ["/dashboard", "/vehicles", "/copilot"].some(
+  const isProtected = ["/dashboard", "/vehicles", "/copilot", "/security"].some(
     (p) => path === p || path.startsWith(`${p}/`)
   );
   const isAuthPage = path === "/login" || path === "/signup";
@@ -58,7 +58,27 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (user && isAuthPage) {
+
+  // A session that has passed the password but not the 6-digit code is only
+  // half authenticated. The database refuses it either way (migration 0010),
+  // so this is about not showing a broken, empty app.
+  let mfaPending = false;
+  if (user) {
+    const { data: aal } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    mfaPending = Boolean(
+      aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2"
+    );
+  }
+
+  if (user && mfaPending && isProtected) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+  // Note the mfaPending guard: without it, a user waiting to type their code
+  // would be bounced from /login to /dashboard and back forever.
+  if (user && !mfaPending && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

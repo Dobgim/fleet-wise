@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/vehicles", label: "Vehicles" },
   { href: "/copilot", label: "AI Copilot" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/security", label: "Security" },
 ];
 
 export function Nav() {

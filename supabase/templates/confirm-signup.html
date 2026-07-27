@@ -1,7 +1,13 @@
 <!-- Fleet Wise — "Confirm signup" email template.
      Paste into: Supabase dashboard → Authentication → Emails → Templates →
      Confirm sign up. Suggested subject:  Welcome to Fleet Wise — confirm your email
-     Keep the {{ .ConfirmationURL }} placeholder exactly as written. -->
+     Keep the {{ .TokenHash }} placeholder exactly as written.
+
+     The link points at /auth/confirm with a token_hash rather than using the
+     usual ConfirmationURL
+     on purpose: the token_hash form is exchanged for a session server-side,
+     so it still works when the email is opened on a different device from
+     the one that signed up. -->
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f4f4f2;padding:32px 16px;">
   <tr>
     <td align="center">
@@ -25,7 +31,7 @@
         </tr>
         <tr>
           <td align="left" style="padding-bottom:28px;">
-            <a href="{{ .ConfirmationURL }}"
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard"
                style="display:inline-block;background-color:#0b0b0b;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:10px;">
               Confirm my email
             </a>
@@ -38,7 +44,7 @@
         </tr>
         <tr>
           <td style="font-size:12px;line-height:1.5;word-break:break-all;padding-bottom:28px;">
-            <a href="{{ .ConfirmationURL }}" style="color:#2a78d6;text-decoration:underline;">{{ .ConfirmationURL }}</a>
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard" style="color:#2a78d6;text-decoration:underline;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard</a>
           </td>
         </tr>
         <tr>

@@ -30,7 +30,12 @@ export default function SignupPage() {
       ({ data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { company_name: company.trim() } },
+        options: {
+          data: { company_name: company.trim() },
+          // Where the confirmation link lands. Without this Supabase uses the
+          // project's Site URL, which on a preview deploy is the wrong host.
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard`,
+        },
       }));
     } catch (e) {
       setError(friendlyAuthError(e instanceof Error ? e.message : "", "signup"));

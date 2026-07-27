@@ -55,8 +55,15 @@ Then paste each template in this folder into
 | `magic-link.html` | Magic Link | Your Fleet Wise sign-in link |
 | `change-email.html` | Change Email Address | Confirm your new email address |
 
-Keep every `{{ .ConfirmationURL }}` placeholder exactly as written — Supabase
-replaces it with the real link.
+Keep every placeholder (`{{ .ConfirmationURL }}`, `{{ .TokenHash }}`,
+`{{ .SiteURL }}`) exactly as written — Supabase replaces them with real values.
+
+> **`confirm-signup.html` is different on purpose.** Its button points at
+> `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`, not at
+> `{{ .ConfirmationURL }}`. The default link uses PKCE, which only completes in
+> the same browser that signed up — people who sign up on a laptop and open
+> the email on their phone would get an error. The `token_hash` form is
+> exchanged for a session by our own route handler and works on any device.
 
 Also set **Authentication → URL Configuration → Site URL** to your live domain,
 or the links in these emails will point at the wrong place.
@@ -98,3 +105,17 @@ provider error if anything fails.
 The templates load the logo from `https://fleet-wise-delta.vercel.app/logo.png`.
 Once your custom domain is live, replace that URL in all four files with
 `https://yourdomain/logo.png` and re-paste them into Supabase.
+
+---
+
+## 3 · Two-factor authentication
+
+Nothing to configure — TOTP is on by default in Supabase and users enrol
+themselves at **/security**. Two things are worth knowing:
+
+- **Run `supabase/migrations/0010_require_mfa.sql`.** Without it, 2FA is
+  cosmetic: a session that has passed the password but not the code would
+  still be accepted by the database.
+- **If a user loses their phone**, they are locked out. Remove their factor
+  in the dashboard: **Authentication → Users → (the user) → Delete factor**.
+  Verify who you are talking to first — this is the one step that undoes 2FA.

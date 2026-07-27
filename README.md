@@ -70,3 +70,25 @@ only touch rows for orgs they are members of, checked via `memberships` +
 `auth.uid()`. Client-side filtering is never relied on for isolation. The
 service-role client is used only in trusted server code (Stripe webhook, AI
 functions) and scopes queries by `org_id` manually.
+
+### Two-factor authentication
+
+Users can enrol an authenticator app (Google Authenticator, Authy, 1Password…)
+at **/security**. It is optional, but once enrolled it cannot be bypassed:
+migration `0010_require_mfa.sql` adds a RESTRICTIVE policy to every table
+requiring the JWT to carry `aal2`, and gates the token-spending functions the
+same way. Hiding pages in the app would not be enough — a stolen password
+yields a valid token that can be pointed straight at the REST API.
+
+The login page therefore has two steps: password, then a 6-digit code. The
+middleware bounces half-authenticated sessions back to `/login` so they see
+the code box instead of an app with no data in it.
+
+### Email confirmation
+
+New accounts must confirm their address before they get a session
+(**Authentication → Sign In / Providers → Confirm email → ON**). The link in
+the email points at `/auth/confirm`, which exchanges a one-time `token_hash`
+for a session server-side — so it still works when the email is opened on a
+different device from the one that signed up, which the default PKCE link
+does not.
