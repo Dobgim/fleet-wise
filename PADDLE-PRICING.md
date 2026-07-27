@@ -4,11 +4,11 @@ New pricing, effective with migration `0013_per_vehicle_pricing.sql`:
 
 | Plan | Price | Vehicles |
 |---|---|---|
-| **Free** | $0 forever, no card | first **3** |
-| **Premium** | **$5 per vehicle / month** beyond the first 3 | unlimited |
+| **Free** | $0 forever, no card | **1** |
+| **Premium** | **$5 per vehicle / month** beyond the first | unlimited |
 | **Business** | **$20 / month** flat | unlimited |
 
-A fleet of 5 pays for 2 vehicles = $10/month. Business becomes cheaper at 8
+A fleet of 5 pays for 4 vehicles = $20/month. Business becomes cheaper at 6
 vehicles and up.
 
 **AI token numbers are no longer shown anywhere.** They still exist as a
@@ -64,9 +64,14 @@ time and a saved variable alone changes nothing.
 
 ## 4 · Run the migrations
 
-Supabase → SQL Editor → run `0012_trial_and_seats.sql`, then
-`0013_per_vehicle_pricing.sql`. 0012 creates the `seats` column and the
-enforcement trigger; 0013 sets the current pricing on top.
+Supabase → SQL Editor → run **in order**: `0012_trial_and_seats.sql`, then
+`0013_per_vehicle_pricing.sql`, then
+`0014_free_one_vehicle_and_mfa_fix.sql`.
+
+0012 creates the `seats` column and the enforcement trigger, 0013 switches to
+per-vehicle pricing, and 0014 sets the free allowance to one vehicle and
+repairs `mfa_satisfied()`. **Never replay 0010 afterwards** — it reinstates an
+`auth.uid()` version of that function that breaks every table under Clerk.
 
 Together they add `seats` to `organizations`, rewrite the limit functions, and
 add a **trigger that enforces the vehicle cap in the database**. That trigger
@@ -107,12 +112,12 @@ paid for, and the trigger enforces exactly that.
 
 Use Paddle's sandbox card `4242 4242 4242 4242`, any future expiry, any CVC.
 
-1. Sign up → Free plan, 3 vehicles allowed, no card asked for.
-2. Add 3 vehicles → the 4th is refused with a link to pricing.
-3. Buy Premium for a 5-vehicle fleet → Paddle quantity **2**, charge $10 →
-   `organizations.seats` becomes 2 and `vehicle_limit_for_org` returns 5.
+1. Sign up → Free plan, 1 vehicle allowed, no card asked for.
+2. Add a vehicle → the 2nd is refused with a link to pricing.
+3. Buy Premium for a 5-vehicle fleet → Paddle quantity **4**, charge $20 →
+   `organizations.seats` becomes 4 and `vehicle_limit_for_org` returns 5.
 4. Add a 6th vehicle → prompt shows the prorated amount → confirm → `seats`
-   becomes 3, the vehicle saves.
+   becomes 5, the vehicle saves.
 5. Switch to Business → prompt shows the difference → `seats` becomes null,
    vehicles unlimited.
 6. Confirm no token counts appear anywhere in the interface.

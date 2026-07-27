@@ -72,8 +72,20 @@ UUIDs that no longer refer to anybody. Clerk user IDs are text
 (`user_2abc…`), not UUIDs, so `auth.uid()` returns null under Clerk — every
 identity check had to be rebuilt on `auth.jwt() ->> 'sub'`.
 
-Run `0010_require_mfa.sql` first if you never did; `0011` redefines the parts
-of it that changed.
+### Migration order matters
+
+Run them **in ascending order and never replay an earlier one**:
+
+```
+0010 → 0011 → 0012 → 0013 → 0014
+```
+
+`0010` is the Supabase Auth version of `mfa_satisfied()`, which calls
+`auth.uid()`. Under Clerk that casts a text user ID to uuid and throws, and
+because the function backs a policy on every table, **replaying 0010 after
+0011 breaks the entire app** — users can sign in but have no workspace, and
+checkout reports that it is unavailable. `0014` restores the correct version
+if this has already happened to you.
 
 ## 5 · Set up the Clerk webhook
 

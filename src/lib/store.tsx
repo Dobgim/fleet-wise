@@ -42,6 +42,8 @@ interface FleetContextValue {
   /** Today's AI token budget, from the database. */
   budget: AiBudget;
   canAddVehicle: boolean;
+  /** Set when the workspace could not be created or read. */
+  orgError: string | null;
   /** Apply the authoritative budget returned by /api/copilot. */
   applyBudget: (b: AiBudget) => void;
   refreshBudget: () => Promise<void>;
@@ -117,6 +119,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => createClient(() => getToken()), [getToken]);
 
   const [ready, setReady] = useState(false);
+  const [orgError, setOrgError] = useState<string | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [remindersEnabled, setRemindersState] = useState(true);
@@ -192,11 +195,19 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false;
     (async () => {
-      const { data: membership } = await supabase
+      const { data: membership, error: memReadErr } = await supabase
         .from("memberships")
         .select("org_id")
         .limit(1)
         .maybeSingle();
+      if (memReadErr) {
+        console.error("membership read failed", memReadErr);
+        if (!cancelled) {
+          setOrgError(`Could not load your workspace: ${memReadErr.message}`);
+          setReady(true);
+        }
+        return;
+      }
 
       let org = membership?.org_id as string | undefined;
       if (!org) {
@@ -211,7 +222,10 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           .insert({ id: newOrgId, name });
         if (orgErr) {
           console.error("org create failed", orgErr);
-          if (!cancelled) setReady(true);
+          if (!cancelled) {
+            setOrgError(`Could not create your workspace: ${orgErr.message}`);
+            setReady(true);
+          }
           return;
         }
         const { error: memErr } = await supabase
@@ -219,7 +233,10 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           .insert({ org_id: newOrgId, user_id: user.id, role: "owner" });
         if (memErr) {
           console.error("membership create failed", memErr);
-          if (!cancelled) setReady(true);
+          if (!cancelled) {
+            setOrgError(`Could not set up your workspace: ${memErr.message}`);
+            setReady(true);
+          }
           return;
         }
         org = newOrgId;
@@ -492,6 +509,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
         plan,
         budget,
         canAddVehicle,
+        orgError,
         applyBudget,
         refreshBudget,
         refreshOrg,

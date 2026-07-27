@@ -110,9 +110,20 @@ function Pricing() {
   const startCheckout = async (id: PaidPlanId) => {
     setNotice("");
     setError("");
+    // Say which of the two things is missing. "Not available right now"
+    // sent us hunting through Paddle when the real cause was a workspace
+    // that had failed to be created.
     const priceId = PADDLE_PRICE[id];
-    if (!priceId || !orgId) {
-      setError("Checkout isn't available right now. Please try again later.");
+    if (!priceId) {
+      setError(
+        "Checkout isn't configured yet — the price for this plan is missing. (Set NEXT_PUBLIC_PADDLE_PRICE_PRO and NEXT_PUBLIC_PADDLE_PRICE_BUSINESS, then redeploy.)"
+      );
+      return;
+    }
+    if (!orgId) {
+      setError(
+        "Your workspace hasn't finished setting up, so there's nothing to attach a subscription to. Reload the page — if it keeps happening, contact us."
+      );
       return;
     }
     setBusy(id);
@@ -208,8 +219,8 @@ function Pricing() {
           </p>
         ) : (
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Your first {FREE_VEHICLES} vehicles are free, forever — no card, no
-            contract. Beyond that it&apos;s $5 per vehicle per month, and you can
+            Your first vehicle is free, forever — no card, no contract. Beyond
+            that it&apos;s ${PLANS.pro.price} per vehicle per month, and you can
             cancel in one click.
           </p>
         )}
@@ -243,7 +254,7 @@ function Pricing() {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">
-            Free — up to {FREE_VEHICLES} vehicles
+            Free — {FREE_VEHICLES === 1 ? "1 vehicle" : `up to ${FREE_VEHICLES} vehicles`}
           </h2>
           {effective === "free" && (
             <span className="btn-brand rounded-full px-2.5 py-0.5 text-xs font-medium">
@@ -254,7 +265,7 @@ function Pricing() {
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Full dashboard, full service history, AI predictive maintenance and
           email reminders. No card, no time limit. You only pay when your fleet
-          outgrows {FREE_VEHICLES} vehicles.
+          grows past {FREE_VEHICLES === 1 ? "one vehicle" : `${FREE_VEHICLES} vehicles`}.
         </p>
       </section>
 
@@ -281,12 +292,15 @@ function Pricing() {
           <p className="text-sm text-[var(--text-secondary)]">
             {billableVehicles(fleet) === 0 ? (
               <>
-                <b>Free.</b> Your first {FREE_VEHICLES} vehicles cost nothing.
+                <b>Free.</b>{" "}
+                {FREE_VEHICLES === 1
+                  ? "Your first vehicle costs nothing."
+                  : `Your first ${FREE_VEHICLES} vehicles cost nothing.`}
               </>
             ) : (
               <>
                 {FREE_VEHICLES} free + {billableVehicles(fleet)} ×{" "}
-                ${PLANS.pro.price} ={" "}
+                ${PLANS.pro.price}/mo ={" "}
                 <b className="text-base">${monthlyCost("pro", fleet)}/month</b>
               </>
             )}

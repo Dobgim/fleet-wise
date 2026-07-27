@@ -15,12 +15,12 @@ export interface PlanConfig {
 
 /**
  * Vehicles included at no charge, on every plan. A Premium customer with five
- * vehicles pays for two.
+ * vehicles pays for four.
  *
- * Must match `free_vehicles()` in 0013_per_vehicle_pricing.sql. Postgres is
- * the authority: the browser can be edited, the database cannot.
+ * Must match `free_vehicles()` in 0014. Postgres is the authority: the
+ * browser can be edited, the database cannot.
  */
-export const FREE_VEHICLES = 3;
+export const FREE_VEHICLES = 1;
 
 /**
  * Pricing follows the category: per vehicle, per month. AI usage is metered
@@ -34,9 +34,9 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
     name: "Premium",
     price: 5,
     perVehicle: true,
-    blurb: "Grow past three vehicles. Pay only for the extras.",
+    blurb: "Grow past one vehicle. Pay only for the extras.",
     features: [
-      `First ${FREE_VEHICLES} vehicles free, then $5 per vehicle per month`,
+      `First vehicle free, then $5 per vehicle per month`,
       "AI predictive maintenance across your whole fleet",
       "Email reminders 7 days and 3 days before each service",
       "Add or remove vehicles anytime — no contract, cancel in one click",
