@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { FleetProvider } from "@/lib/store";
 import { Nav } from "@/components/nav";
@@ -32,11 +33,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <FleetProvider>
-          <Nav />
-          {children}
-          <Footer />
-        </FleetProvider>
+        {/* Clerk owns identity, so it wraps everything — FleetProvider reads
+            the session from it to authenticate its Supabase queries. */}
+        <ClerkProvider>
+          <FleetProvider>
+            <Nav />
+            {children}
+            <Footer />
+          </FleetProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { User } from "@supabase/supabase-js";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "./supabase/client";
 import { buildSeedData } from "./seed";
 import { PLANS } from "./plans";
@@ -101,9 +101,18 @@ function toRecord(row: any): ServiceRecord {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export function FleetProvider({ children }: { children: ReactNode }) {
-  const supabase = useMemo(() => createClient(), []);
+  // Identity comes from Clerk. `isLoaded` matters: until it flips, Clerk does
+  // not yet know whether anyone is signed in, and acting on that would either
+  // create a duplicate org or wrongly clear the screen.
+  const { user, isLoaded: userLoaded } = useUser();
+  const { getToken, signOut: clerkSignOut } = useAuth();
+
+  // getToken is stable across renders, so the Supabase client is built once.
+  // It calls getToken per request and therefore always sends a live token,
+  // even though this client outlives many token rotations.
+  const supabase = useMemo(() => createClient(() => getToken()), [getToken]);
+
   const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [remindersEnabled, setRemindersState] = useState(true);
@@ -111,18 +120,6 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   const [budget, setBudget] = useState<AiBudget>(emptyBudget());
-
-  // Track the auth session
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
-      if (!data.user) setReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [supabase]);
 
   const refreshBudget = useCallback(async () => {
     const { data, error } = await supabase.rpc("get_ai_budget");
@@ -177,12 +174,16 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
   // Bootstrap: find (or create) the user's organization, then load its data
   useEffect(() => {
+    // Wait for Clerk to report. Treating "not loaded yet" as "signed out"
+    // would blank the app on every refresh.
+    if (!userLoaded) return;
     if (!user) {
       setOrgId(null);
       setOrgName(null);
       setVehicles([]);
       setRecords([]);
       setPlanState("free");
+      setReady(true);
       return;
     }
     let cancelled = false;
@@ -195,10 +196,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
       let org = membership?.org_id as string | undefined;
       if (!org) {
-        // First login: create the organization + owner membership
+        // First sign-in: create the organization + owner membership.
+        const email = user.primaryEmailAddress?.emailAddress;
         const name =
-          (user.user_metadata?.company_name as string | undefined)?.trim() ||
-          `${user.email?.split("@")[0] ?? "My"}'s garage`;
+          (user.unsafeMetadata?.company_name as string | undefined)?.trim() ||
+          `${email?.split("@")[0] ?? "My"}'s garage`;
         const newOrgId = crypto.randomUUID();
         const { error: orgErr } = await supabase
           .from("organizations")
@@ -236,7 +238,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, supabase, fetchFleet, refreshBudget]);
+  }, [user, userLoaded, supabase, fetchFleet, refreshBudget]);
 
   const fail = useCallback(
     (context: string, message: string, org: string | null) => {
@@ -470,8 +472,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-  }, [supabase]);
+    await clerkSignOut();
+  }, [clerkSignOut]);
 
   const planCfg = PLANS[plan];
   const canAddVehicle =
@@ -481,7 +483,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     <FleetContext.Provider
       value={{
         ready,
-        userEmail: user?.email ?? null,
+        userEmail: user?.primaryEmailAddress?.emailAddress ?? null,
         orgId,
         orgName,
         remindersEnabled,

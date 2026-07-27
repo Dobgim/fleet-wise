@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { buildReminderEmail } from "@/lib/emails/reminder-template";
@@ -13,10 +14,9 @@ import type { ServiceRecord, ServiceType, Vehicle } from "@/lib/types";
  */
 export async function POST() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) {
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress;
+  if (!email) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
@@ -77,7 +77,7 @@ export async function POST() {
     logoUrl: `${siteUrl}/logo.png`,
   });
 
-  const result = await sendEmail({ to: user.email, subject, html });
+  const result = await sendEmail({ to: email, subject, html });
   if (!result.ok) {
     return NextResponse.json(
       { error: `Could not send the email: ${result.error}` },
@@ -87,7 +87,7 @@ export async function POST() {
 
   return NextResponse.json({
     ok: true,
-    sentTo: user.email,
+    sentTo: email,
     itemCount: items.length,
   });
 }

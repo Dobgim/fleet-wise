@@ -7,9 +7,10 @@ cost/maintenance dashboard, and an AI copilot grounded in the org's own data.
 ## Stack
 
 - **Frontend:** Next.js (App Router) + React + TypeScript + Tailwind CSS
-- **Backend/DB:** Supabase (Postgres, Auth, Storage, Edge Functions) with
-  Row-Level Security as the tenant-isolation source of truth
-- **Payments:** Stripe subscriptions (webhook via Edge Function)
+- **Auth:** Clerk (sign-in, email verification, 2FA) — see `CLERK-SETUP.md`
+- **Backend/DB:** Supabase (Postgres, Storage) with Row-Level Security as the
+  tenant-isolation source of truth, trusting Clerk session tokens
+- **Payments:** Paddle subscriptions (merchant of record)
 - **Email:** Resend · **Analytics:** PostHog · **Hosting:** Vercel + Supabase
 
 ## Setup
@@ -20,7 +21,10 @@ cost/maintenance dashboard, and an AI copilot grounded in the org's own data.
    npm install
    ```
 
-2. **Create a Supabase project** at [supabase.com](https://supabase.com), then
+2. **Set up Clerk** — follow `CLERK-SETUP.md` end to end. Nothing signs in
+   until Clerk is connected to Supabase as a third-party auth provider.
+
+3. **Create a Supabase project** at [supabase.com](https://supabase.com), then
    copy the env template and fill in the values from *Project Settings → API*:
 
    ```bash
@@ -30,7 +34,7 @@ cost/maintenance dashboard, and an AI copilot grounded in the org's own data.
    `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS. It is server-only — never prefix
    it with `NEXT_PUBLIC_` or import it in client code.
 
-3. **Run migrations** (added in step 2 of the build) with the Supabase CLI:
+4. **Run migrations** with the Supabase CLI:
 
    ```bash
    npx supabase login
@@ -39,7 +43,7 @@ cost/maintenance dashboard, and an AI copilot grounded in the org's own data.
    npx supabase db seed          # optional sample data
    ```
 
-4. **Run the dev server**
+5. **Run the dev server**
 
    ```bash
    npm run dev
@@ -71,24 +75,25 @@ only touch rows for orgs they are members of, checked via `memberships` +
 service-role client is used only in trusted server code (Stripe webhook, AI
 functions) and scopes queries by `org_id` manually.
 
+Identity is Clerk's; authorization is Postgres's. Clerk user IDs are text
+(`user_2abc…`), so policies read `auth.jwt() ->> 'sub'` — `auth.uid()` returns
+null under Clerk and must never be used.
+
 ### Two-factor authentication
 
-Users can enrol an authenticator app (Google Authenticator, Authy, 1Password…)
-at **/security**. It is optional, but once enrolled it cannot be bypassed:
-migration `0010_require_mfa.sql` adds a RESTRICTIVE policy to every table
-requiring the JWT to carry `aal2`, and gates the token-spending functions the
-same way. Hiding pages in the app would not be enough — a stolen password
-yields a valid token that can be pointed straight at the REST API.
+Users enrol an authenticator app at **/security** (Clerk's own UI, which also
+covers backup codes and self-service recovery). It is optional, but once
+enrolled it cannot be bypassed: migration `0011` keeps a RESTRICTIVE policy on
+every table requiring the token's `fva` claim to prove a second factor was
+verified, for any user whose `profiles.mfa_enabled` is true. Hiding pages in
+the app would not be enough — a stolen token can be pointed straight at the
+REST API.
 
-The login page therefore has two steps: password, then a 6-digit code. The
-middleware bounces half-authenticated sessions back to `/login` so they see
-the code box instead of an app with no data in it.
+`profiles.mfa_enabled` is written only by the service role, in the Clerk
+webhook. A user who could edit their own flag could switch off their own
+protection.
 
-### Email confirmation
+### Email verification
 
-New accounts must confirm their address before they get a session
-(**Authentication → Sign In / Providers → Confirm email → ON**). The link in
-the email points at `/auth/confirm`, which exchanges a one-time `token_hash`
-for a session server-side — so it still works when the email is opened on a
-different device from the one that signed up, which the default PKCE link
-does not.
+Handled by Clerk, from its own sending domain. There is no confirmation route
+in this codebase any more.

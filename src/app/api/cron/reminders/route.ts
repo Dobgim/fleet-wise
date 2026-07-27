@@ -138,10 +138,16 @@ export async function GET(request: Request) {
       summary.skippedNoRecipient++;
       continue;
     }
-    const { data: userInfo } = await supabase.auth.admin.getUserById(
-      membership.user_id
-    );
-    const recipient = userInfo?.user?.email;
+    // Addresses come from `profiles`, mirrored from Clerk by its webhook.
+    // Asking Clerk's API here instead would mean one network round trip per
+    // organization, every night, to learn something that never changes.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("user_id", membership.user_id)
+      .maybeSingle();
+
+    const recipient = profile?.email;
     if (!recipient) {
       summary.skippedNoRecipient++;
       continue;

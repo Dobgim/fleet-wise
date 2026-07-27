@@ -18,8 +18,14 @@ async function ownerEmail(admin: Admin, orgId: string): Promise<string | null> {
     .limit(1)
     .maybeSingle();
   if (!membership?.user_id) return null;
-  const { data } = await admin.auth.admin.getUserById(membership.user_id);
-  return data?.user?.email ?? null;
+  // Mirrored from Clerk by /api/clerk/webhook — Supabase Auth no longer holds
+  // user records, so there is no auth.users row to read.
+  const { data } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("user_id", membership.user_id)
+    .maybeSingle();
+  return data?.email ?? null;
 }
 
 /**

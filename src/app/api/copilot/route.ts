@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { MFA_REQUIRED, needsMfaChallenge as mfaPending } from "@/lib/mfa";
+import { auth } from "@clerk/nextjs/server";
+import { MFA_REQUIRED } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -74,20 +75,20 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const { userId } = await auth();
+  if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
-  if (await mfaPending(supabase)) {
-    return NextResponse.json({ error: MFA_REQUIRED }, { status: 403 });
   }
 
   // Pre-flight: does this org have enough of today's token budget left?
   const { data: budgetData, error: budgetError } =
     await supabase.rpc("check_ai_budget");
   if (budgetError) {
+    // Postgres raises this when a 2FA-enabled user has not cleared their
+    // second factor. It is a legitimate refusal, not a fault.
+    if (budgetError.message?.includes("Two-factor authentication required")) {
+      return NextResponse.json({ error: MFA_REQUIRED }, { status: 403 });
+    }
     console.error("budget rpc failed", budgetError.message);
     return NextResponse.json(
       { error: "Could not verify your token budget" },

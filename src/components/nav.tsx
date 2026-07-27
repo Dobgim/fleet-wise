@@ -33,6 +33,8 @@ export function Nav() {
   }, [open]);
 
   const handleSignOut = async () => {
+    // Clerk clears its own session and cookies; the push is what gets the
+    // user off a page they can no longer read.
     await signOut();
     router.push("/login");
     router.refresh();
