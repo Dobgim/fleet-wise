@@ -13,10 +13,47 @@ interface PaddleCheckoutOptions {
   settings?: { successUrl?: string; theme?: "light" | "dark" };
 }
 
+interface PaddleEvent {
+  name?: string;
+  data?: unknown;
+  error?: { detail?: string; code?: string };
+}
+
 interface PaddleGlobal {
   Environment: { set: (env: "sandbox" | "production") => void };
-  Initialize: (opts: { token: string }) => void;
+  Initialize: (opts: {
+    token: string;
+    eventCallback?: (event: PaddleEvent) => void;
+  }) => void;
   Checkout: { open: (opts: PaddleCheckoutOptions) => void };
+}
+
+/**
+ * Where checkout errors go.
+ *
+ * Paddle reports a rejected checkout through its event callback, not by
+ * throwing — so without this a failure showed up only as an anonymous 400 in
+ * the browser console while the page sat there looking fine. Set per call by
+ * openPaddleCheckout.
+ */
+let onCheckoutError: ((message: string) => void) | null = null;
+
+function describePaddleError(event: PaddleEvent): string {
+  const detail = event.error?.detail ?? "";
+  const text = detail.toLowerCase();
+
+  // The common misconfigurations, named plainly rather than echoed as jargon.
+  if (text.includes("domain") || text.includes("approved"))
+    return "Paddle rejected this website. Add this domain under Paddle → Checkout settings → Approved domains (include localhost for local testing).";
+  if (text.includes("payment link") || text.includes("default"))
+    return "Paddle has no default payment link set. Add one under Paddle → Checkout settings.";
+  if (text.includes("quantity"))
+    return "That vehicle count is outside the range allowed on the Paddle price.";
+  if (text.includes("price") && text.includes("not found"))
+    return "That price no longer exists in Paddle — it may have been archived.";
+  return detail
+    ? `Paddle refused the checkout: ${detail}`
+    : "Paddle refused the checkout. Check that this domain is approved and a default payment link is set.";
 }
 
 declare global {
@@ -49,7 +86,15 @@ export function loadPaddle(): Promise<PaddleGlobal> {
       if (process.env.NEXT_PUBLIC_PADDLE_ENV !== "production") {
         p.Environment.set("sandbox");
       }
-      p.Initialize({ token });
+      p.Initialize({
+        token,
+        eventCallback: (event) => {
+          if (event?.name === "checkout.error") {
+            console.error("paddle checkout error", event);
+            onCheckoutError?.(describePaddleError(event));
+          }
+        },
+      });
       resolve(p);
     };
 
@@ -84,7 +129,10 @@ export async function openPaddleCheckout(params: {
   quantity?: number;
   email?: string;
   successUrl?: string;
+  /** Called if Paddle rejects the checkout after the overlay opens. */
+  onError?: (message: string) => void;
 }) {
+  onCheckoutError = params.onError ?? null;
   const paddle = await loadPaddle();
   paddle.Checkout.open({
     items: [

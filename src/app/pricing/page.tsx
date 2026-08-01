@@ -134,6 +134,12 @@ function Pricing() {
         quantity: quantityFor(id, fleet),
         email: userEmail ?? undefined,
         successUrl: `${window.location.origin}/pricing?checkout=success`,
+        // Paddle reports a rejected checkout asynchronously, after the
+        // overlay has already opened, so this cannot be a thrown error.
+        onError: (message) => {
+          setError(message);
+          setBusy(null);
+        },
       });
     } catch {
       setError("Couldn't open checkout. Please try again.");
