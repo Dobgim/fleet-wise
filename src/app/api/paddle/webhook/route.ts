@@ -92,7 +92,7 @@ async function applySubscription(sub: Subscriptionish) {
       if (to) {
         const siteUrl =
           process.env.NEXT_PUBLIC_SITE_URL ||
-          "https://fleet-wise-delta.vercel.app";
+          "https://motorwise.co";
         const { subject, html } = buildSubscriptionEmail({
           garageName: before?.name ?? "your garage",
           // `upgraded` is only true for a paid plan, so this narrowing holds.

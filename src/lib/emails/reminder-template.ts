@@ -84,7 +84,7 @@ export function buildReminderEmail(params: {
   <tr><td align="center">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background-color:#ffffff;border-radius:16px;padding:36px 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;">
       <tr><td style="padding-bottom:22px;">
-        <img src="${logoUrl}" width="44" height="44" alt="Fleet Wise" style="display:block;border:0;border-radius:11px;" />
+        <img src="${logoUrl}" width="44" height="44" alt="MotorWise" style="display:block;border:0;border-radius:11px;" />
       </td></tr>
       <tr><td style="font-size:22px;font-weight:700;color:#0b0b0b;padding-bottom:8px;">
         Maintenance due in ${esc(garageName)}
@@ -106,7 +106,7 @@ export function buildReminderEmail(params: {
       </td></tr>
       <tr><td style="border-top:1px solid #e1e0d9;padding-top:18px;margin-top:26px;font-size:12px;line-height:1.6;color:#898781;">
         You're receiving this because email reminders are on for ${esc(garageName)}.
-        Turn them off any time from your dashboard.<br />— Fleet Wise
+        Turn them off any time from your dashboard.<br />— MotorWise
       </td></tr>
     </table>
   </td></tr>

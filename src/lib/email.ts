@@ -18,11 +18,11 @@ export type SendResult =
   | { ok: false; error: string };
 
 function fromName(): string {
-  return process.env.EMAIL_FROM_NAME || "Fleet Wise";
+  return process.env.EMAIL_FROM_NAME || "MotorWise";
 }
 
 function fromAddress(): string {
-  return process.env.EMAIL_FROM || "no-reply@fleetwise.app";
+  return process.env.EMAIL_FROM || "no-reply@motorwise.co";
 }
 
 export function emailConfigured(): boolean {

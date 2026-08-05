@@ -1,5 +1,5 @@
 /**
- * Makes Clerk's hosted UI look like the rest of Fleet Wise.
+ * Makes Clerk's hosted UI look like the rest of MotorWise.
  *
  * Colours are given as literals rather than var(--brand): Clerk renders parts
  * of its UI in a shadow root, where the app's CSS custom properties are not

@@ -3,8 +3,8 @@ import { LegalPage, Section } from "@/components/legal";
 import { SUPPORT_EMAIL } from "@/lib/company";
 
 export const metadata: Metadata = {
-  title: "Refund Policy — Fleet Wise",
-  description: "When and how you can get a refund from Fleet Wise.",
+  title: "Refund Policy — MotorWise",
+  description: "When and how you can get a refund from MotorWise.",
 };
 
 export default function RefundsPage() {
@@ -12,7 +12,7 @@ export default function RefundsPage() {
     <LegalPage title="Refund Policy" updated="26 July 2026">
       <Section heading="Try before you pay">
         <p>
-          Every Fleet Wise account starts with a <strong>14-day free trial</strong>{" "}
+          Every MotorWise account starts with a <strong>14-day free trial</strong>{" "}
           that needs no card and charges nothing when it ends. We would rather
           you used it first and subscribed only if the product earns it.
         </p>
@@ -39,7 +39,7 @@ export default function RefundsPage() {
 
       <Section heading="If the service does not work">
         <p>
-          If Fleet Wise is substantially unavailable or a paid feature does not
+          If MotorWise is substantially unavailable or a paid feature does not
           function for an extended period, tell us. We will fix it, extend your
           plan, or refund you.
         </p>

@@ -24,7 +24,7 @@ without a cliff.
 
 ## 1 · Change the Business price to $20
 
-Paddle → **Catalog → Products → Fleet Wise Business → Prices**.
+Paddle → **Catalog → Products → MotorWise Business → Prices**.
 
 Paddle prices are **immutable in the ways that matter** — you cannot edit the
 amount of a price that has been used. Create a new one:
@@ -35,7 +35,7 @@ amount of a price that has been used. Create a new one:
 
 ## 2 · Create the Premium per-vehicle price
 
-Paddle → **Catalog → Products → Fleet Wise Premium → New price**.
+Paddle → **Catalog → Products → MotorWise Premium → New price**.
 
 | Field | Value |
 |---|---|

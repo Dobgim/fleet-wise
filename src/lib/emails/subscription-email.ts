@@ -32,13 +32,13 @@ export function buildSubscriptionEmail(params: {
   ];
 
   return {
-    subject: `${cfg.name} is active — welcome to Fleet Wise`,
+    subject: `${cfg.name} is active — welcome to MotorWise`,
     html: `
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f4f4f2;padding:32px 16px;">
   <tr><td align="center">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background-color:#ffffff;border-radius:16px;padding:38px 32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;">
       <tr><td style="padding-bottom:22px;">
-        <img src="${logoUrl}" width="46" height="46" alt="Fleet Wise" style="display:block;border:0;border-radius:11px;" />
+        <img src="${logoUrl}" width="46" height="46" alt="MotorWise" style="display:block;border:0;border-radius:11px;" />
       </td></tr>
       <tr><td style="font-size:23px;font-weight:700;color:#0b0b0b;padding-bottom:10px;">
         ${esc(cfg.name)} is now active
@@ -67,9 +67,9 @@ export function buildSubscriptionEmail(params: {
       </td></tr>
       <tr><td style="border-top:1px solid #e1e0d9;padding-top:18px;font-size:12px;line-height:1.6;color:#898781;">
         Your invoice is emailed separately by <b>Paddle</b>, which handles
-        billing for Fleet Wise. Use the link in that receipt to update your
+        billing for MotorWise. Use the link in that receipt to update your
         card or cancel at any time.<br /><br />
-        &mdash; The Fleet Wise team
+        &mdash; The MotorWise team
       </td></tr>
     </table>
   </td></tr>

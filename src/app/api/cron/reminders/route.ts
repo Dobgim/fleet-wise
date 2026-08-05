@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://fleet-wise-delta.vercel.app";
+    process.env.NEXT_PUBLIC_SITE_URL || "https://motorwise.co";
   const logoUrl = `${siteUrl}/logo.png`;
   const today = new Date().toISOString().slice(0, 10);
 

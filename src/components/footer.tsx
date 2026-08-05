@@ -11,7 +11,7 @@ export function Footer() {
     <footer className="border-t border-neutral-200 px-4 py-6 text-xs text-[var(--text-muted)] dark:border-neutral-800">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-5 gap-y-2 text-center">
         <span>
-          © {new Date().getFullYear()} Fleet Wise · {COMPANY_LOCATION}
+          © {new Date().getFullYear()} MotorWise · {COMPANY_LOCATION}
         </span>
         <Link href="/pricing" className="hover:underline">
           Pricing

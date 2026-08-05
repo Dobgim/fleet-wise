@@ -1,6 +1,6 @@
-# Fleet Wise email setup (Resend)
+# MotorWise email setup (Resend)
 
-Fleet Wise sends two **different kinds** of email through two different paths.
+MotorWise sends two **different kinds** of email through two different paths.
 Both need to be pointed at Resend, and they are configured in different places.
 
 | Kind | Examples | Sent by | Configured in |
@@ -16,7 +16,7 @@ Resend will not send from a `@gmail.com` address. Without a verified domain
 you can only send to the address that owns the Resend account, which is fine
 for a first test but useless for real users.
 
-1. Buy a domain (e.g. `fleetwiseai.com`).
+1. Buy a domain (e.g. `motorwise.co`).
 2. Resend → **Domains → Add Domain** → enter it.
 3. Resend shows DNS records (DKIM, SPF, and usually DMARC). Add each one at
    your registrar's DNS panel.
@@ -40,7 +40,7 @@ Supabase dashboard → **Project Settings → Authentication → SMTP Settings**
 | Username | `resend` |
 | Password | your Resend API key (`re_...`) |
 | Sender email | `hello@yourdomain` (must be on the verified domain) |
-| Sender name | `Fleet Wise` |
+| Sender name | `MotorWise` |
 
 Save. This also **unlocks template editing** — Supabase locks the templates
 until custom SMTP is configured.
@@ -50,9 +50,9 @@ Then paste each template in this folder into
 
 | File | Supabase template | Suggested subject |
 |---|---|---|
-| `confirm-signup.html` | Confirm sign up | Welcome to Fleet Wise — confirm your email |
-| `reset-password.html` | Reset password | Reset your Fleet Wise password |
-| `magic-link.html` | Magic Link | Your Fleet Wise sign-in link |
+| `confirm-signup.html` | Confirm sign up | Welcome to MotorWise — confirm your email |
+| `reset-password.html` | Reset password | Reset your MotorWise password |
+| `magic-link.html` | Magic Link | Your MotorWise sign-in link |
 | `change-email.html` | Change Email Address | Confirm your new email address |
 
 Keep every placeholder (`{{ .ConfirmationURL }}`, `{{ .TokenHash }}`,
@@ -84,7 +84,7 @@ then redeploy:
 ```
 RESEND_API_KEY=re_...            # mark Sensitive
 EMAIL_FROM=hello@yourdomain
-EMAIL_FROM_NAME=Fleet Wise       # optional, this is the default
+EMAIL_FROM_NAME=MotorWise       # optional, this is the default
 EMAIL_REPLY_TO=you@yourdomain    # optional
 ```
 
@@ -102,7 +102,7 @@ provider error if anything fails.
 
 ## Updating the logo URL
 
-The templates load the logo from `https://fleet-wise-delta.vercel.app/logo.png`.
+The templates load the logo from `https://motorwise.co/logo.png`.
 Once your custom domain is live, replace that URL in all four files with
 `https://yourdomain/logo.png` and re-paste them into Supabase.
 

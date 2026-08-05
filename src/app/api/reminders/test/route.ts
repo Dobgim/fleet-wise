@@ -69,7 +69,7 @@ export async function POST() {
   }
 
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://fleet-wise-delta.vercel.app";
+    process.env.NEXT_PUBLIC_SITE_URL || "https://motorwise.co";
   const { subject, html } = buildReminderEmail({
     garageName: orgRow?.name ?? "your garage",
     items,

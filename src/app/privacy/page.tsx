@@ -3,8 +3,8 @@ import { LegalPage, Section } from "@/components/legal";
 import { SUPPORT_EMAIL } from "@/lib/company";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Fleet Wise",
-  description: "What Fleet Wise collects, why, and who it is shared with.",
+  title: "Privacy Policy — MotorWise",
+  description: "What MotorWise collects, why, and who it is shared with.",
 };
 
 export default function PrivacyPage() {
@@ -43,7 +43,7 @@ export default function PrivacyPage() {
 
       <Section heading="Who we share it with">
         <p>
-          Only the providers needed to operate Fleet Wise, and only what they
+          Only the providers needed to operate MotorWise, and only what they
           need:
         </p>
         <ul className="ml-5 list-disc space-y-1">

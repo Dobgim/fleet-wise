@@ -1,4 +1,4 @@
-# Switching Fleet Wise to Clerk authentication
+# Switching MotorWise to Clerk authentication
 
 Clerk is now the identity provider. Supabase still stores all the data and
 still decides who may touch it — it simply trusts a Clerk session token
@@ -12,7 +12,7 @@ in; the app will be broken in between, which is expected.
 ## 1 · Create the Clerk application
 
 1. Sign up at [clerk.com](https://clerk.com) and create an application.
-2. Name it **Fleet Wise**.
+2. Name it **MotorWise**.
 3. Under **sign-in options**, enable **Email** and **Password**. Turn on
    **Email verification code** — this replaces the Supabase confirmation email
    that never reliably delivered, and it sends from Clerk's own warmed domain,
@@ -47,7 +47,7 @@ pointing at the development one it will reject every signed-in user.
 This is the step that makes Supabase accept Clerk's tokens.
 
 1. Go straight to **https://dashboard.clerk.com/setup/supabase**, pick your
-   Fleet Wise instance, then click **Activate Supabase integration**.
+   MotorWise instance, then click **Activate Supabase integration**.
    The **Clerk domain** is only revealed *after* you activate — it looks like
    `https://verb-noun-42.clerk.accounts.dev`. Copy it including `https://`.
    (Same value as **Frontend API URL** on the API keys page.)
