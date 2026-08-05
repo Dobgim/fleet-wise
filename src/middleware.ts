@@ -5,6 +5,12 @@ import { NextResponse } from "next/server";
  * Clerk runs on every request, reads the session, and guards the private
  * routes.
  *
+ * This is `middleware.ts`, not Next 16's newer `proxy.ts`, on purpose:
+ * proxy.ts is locked to the Node.js runtime, and Cloudflare Workers only
+ * runs Next.js middleware on the Edge runtime. middleware.ts is deprecated
+ * in Next 16 but still supported, and is the only form that deploys to
+ * Workers today. Revisit when OpenNext supports Node middleware.
+ *
  * /pricing stays public: prospective customers — and payment providers
  * reviewing the site — must be able to see what is sold and for how much
  * without creating an account.
