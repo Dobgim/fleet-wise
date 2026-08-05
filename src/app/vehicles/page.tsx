@@ -130,7 +130,9 @@ export default function VehiclesPage() {
       setError(
         budget.plan === "pro"
           ? `Your plan covers ${budget.vehicleLimit} vehicles. Add one to make room.`
-          : `Free covers ${budget.freeVehicles} vehicles — add a paid vehicle to go further.`
+          : budget.beta
+            ? `The free beta covers ${budget.freeVehicles} vehicles.`
+            : `Free covers ${budget.freeVehicles} vehicles — add a paid vehicle to go further.`
       );
       return;
     }
@@ -271,6 +273,12 @@ export default function VehiclesPage() {
                   ? "Updating…"
                   : `Add a vehicle to my plan (+$${PLANS.pro.price}/mo)`}
               </button>
+            </>
+          ) : budget.beta ? (
+            <>
+              You&apos;ve reached the {budget.freeVehicles}-vehicle limit of the
+              free beta. Email us if you need more — while MotorWise is in beta
+              we can raise it for you at no cost.
             </>
           ) : (
             <>

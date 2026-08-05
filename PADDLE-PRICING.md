@@ -127,3 +127,48 @@ Use Paddle's sandbox card `4242 4242 4242 4242`, any future expiry, any CVC.
 5. Switch to Business → prompt shows the difference → `seats` becomes null,
    vehicles unlimited.
 6. Confirm no token counts appear anywhere in the interface.
+
+---
+
+## Beta mode — running free before revenue
+
+Vercel's Hobby plan is licensed for **non-commercial use only**, so taking a
+payment means upgrading to Pro at $20/month. Until there is revenue to cover
+that, billing stays off.
+
+The switch is a **database row**, not an environment variable, because it has
+to govern two things that must never disagree: what the pricing page offers,
+and what the vehicle-limit trigger allows. Hiding the checkout button alone
+would leave beta users capped at one vehicle with no way to add a second.
+
+```sql
+-- start charging
+update public.app_config set beta_mode = false;
+
+-- go back to free
+update public.app_config set beta_mode = true;
+
+-- change how many vehicles the beta allows
+update public.app_config set beta_vehicle_limit = 50;
+```
+
+While `beta_mode` is true:
+
+| | Beta | Live |
+|---|---|---|
+| Free vehicles | `beta_vehicle_limit` (25) | 1 |
+| Free AI fair-use | 50,000/day | 15,000/day |
+| Pricing page | plans shown, "Free during beta" | checkout buttons |
+| Paddle | untouched and still wired | charges |
+
+Nothing about the Paddle integration is removed or disabled — prices,
+webhook and the subscription-update endpoint stay exactly as they are, so
+turning billing on is one `UPDATE` and no redeploy.
+
+**Before flipping it off**, remember what becomes true the moment money moves:
+
+- Vercel must be on **Pro** ($20/month) — a licensing requirement
+- Supabase Free has **no daily backups**; $25/month buys them, and paying
+  customers' maintenance history is not something to hold without backups
+- Paddle takes **5% + $0.50 per transaction**, which on a $5 subscription is
+  15% — worth offering annual billing before leaning on the $5 price point

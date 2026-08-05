@@ -54,6 +54,10 @@ function Pricing() {
 
   const effective = budget.plan;
   const subscribed = effective === "pro" || effective === "business";
+  // Set in the database (app_config.beta_mode) — the same switch that sets
+  // the vehicle allowance, so the price shown and the limit enforced can
+  // never disagree.
+  const beta = budget.beta;
 
   // Returning from checkout. Paddle sends the browser back within about a
   // second, but the plan is granted asynchronously by the webhook — so poll
@@ -249,6 +253,18 @@ function Pricing() {
         </div>
       )}
 
+      {beta && (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{ borderColor: "var(--brand)", background: "var(--brand-soft)" }}
+        >
+          <b>MotorWise is free while in beta.</b> Everything below is what it
+          will cost when billing opens — nothing is charged today, and you
+          keep {budget.freeVehicles} vehicles free in the meantime. We&apos;ll
+          email you well before anything changes.
+        </div>
+      )}
+
       {/* ---- Free tier: stated plainly, not sold ---- */}
       <section
         className="rounded-xl border p-5"
@@ -260,7 +276,11 @@ function Pricing() {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">
-            Free — {FREE_VEHICLES === 1 ? "1 vehicle" : `up to ${FREE_VEHICLES} vehicles`}
+            {beta
+              ? `Free beta — up to ${budget.freeVehicles} vehicles`
+              : FREE_VEHICLES === 1
+                ? "Free — 1 vehicle"
+                : `Free — up to ${FREE_VEHICLES} vehicles`}
           </h2>
           {effective === "free" && (
             <span className="btn-brand rounded-full px-2.5 py-0.5 text-xs font-medium">
@@ -373,7 +393,11 @@ function Pricing() {
                 ))}
               </ul>
 
-              {signedIn ? (
+              {signedIn && beta ? (
+                <div className="mt-5 rounded-md border border-neutral-300 px-4 py-2 text-center text-sm text-[var(--text-secondary)] dark:border-neutral-700">
+                  Free during beta
+                </div>
+              ) : signedIn ? (
                 <button
                   disabled={!BILLING_LIVE || busy !== null}
                   onClick={() => choose(id)}
@@ -394,7 +418,7 @@ function Pricing() {
                   href="/signup"
                   className="btn-brand mt-5 rounded-md px-4 py-2 text-center text-sm font-medium"
                 >
-                  Start free
+                  {beta ? "Join the free beta" : "Start free"}
                 </Link>
               )}
             </section>
