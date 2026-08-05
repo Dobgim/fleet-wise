@@ -4,11 +4,11 @@ New pricing, effective with migration `0013_per_vehicle_pricing.sql`:
 
 | Plan | Price | Vehicles |
 |---|---|---|
-| **Free** | $0 forever, no card | **1** |
-| **Premium** | **$5 per vehicle / month** beyond the first | unlimited |
+| **Free** | $0 forever, no card | **2** |
+| **Premium** | **$5 per vehicle / month** beyond the first two | unlimited |
 | **Business** | **$20 / month** flat | unlimited |
 
-A fleet of 5 pays for 4 vehicles = $20/month. Business becomes cheaper at 6
+A fleet of 5 pays for 3 vehicles = $15/month. Business becomes cheaper at 7
 vehicles and up.
 
 **AI token numbers are no longer shown anywhere.** They still exist as a
@@ -49,10 +49,10 @@ the number of **billable** vehicles as the quantity, and Paddle multiplies.
 Paddle defaults this to **1–100**, so raise the maximum — otherwise a fleet of
 more than 101 vehicles cannot check out.
 
-**Quantity = total vehicles − 1.** The free vehicle is subtracted by this app
-before the number ever reaches Paddle, so Paddle only ever sees what is
+**Quantity = total vehicles − 2.** The free vehicles are subtracted by this
+app before the number ever reaches Paddle, so Paddle only ever sees what is
 actually charged for. `organizations.seats` stores the same number: a
-5-vehicle fleet buys quantity 4 and pays $20.
+5-vehicle fleet buys quantity 3 and pays $15.
 
 Archive the old flat $20 Premium price.
 
@@ -118,12 +118,12 @@ paid for, and the trigger enforces exactly that.
 
 Use Paddle's sandbox card `4242 4242 4242 4242`, any future expiry, any CVC.
 
-1. Sign up → Free plan, 1 vehicle allowed, no card asked for.
-2. Add a vehicle → the 2nd is refused with a link to pricing.
-3. Buy Premium for a 5-vehicle fleet → Paddle quantity **4**, charge $20 →
-   `organizations.seats` becomes 4 and `vehicle_limit_for_org` returns 5.
+1. Sign up → Free plan, 2 vehicles allowed, no card asked for.
+2. Add two vehicles → the 3rd is refused with a link to pricing.
+3. Buy Premium for a 5-vehicle fleet → Paddle quantity **3**, charge $15 →
+   `organizations.seats` becomes 3 and `vehicle_limit_for_org` returns 5.
 4. Add a 6th vehicle → prompt shows the prorated amount → confirm → `seats`
-   becomes 5, the vehicle saves.
+   becomes 4, the vehicle saves.
 5. Switch to Business → prompt shows the difference → `seats` becomes null,
    vehicles unlimited.
 6. Confirm no token counts appear anywhere in the interface.
@@ -149,14 +149,14 @@ update public.app_config set beta_mode = false;
 update public.app_config set beta_mode = true;
 
 -- change how many vehicles the beta allows
-update public.app_config set beta_vehicle_limit = 50;
+update public.app_config set beta_vehicle_limit = 5;
 ```
 
 While `beta_mode` is true:
 
 | | Beta | Live |
 |---|---|---|
-| Free vehicles | `beta_vehicle_limit` (25) | 1 |
+| Free vehicles | `beta_vehicle_limit` (1) | 2 |
 | Free AI fair-use | 50,000/day | 15,000/day |
 | Pricing page | plans shown, "Free during beta" | checkout buttons |
 | Paddle | untouched and still wired | charges |

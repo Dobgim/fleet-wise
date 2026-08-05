@@ -14,13 +14,15 @@ export interface PlanConfig {
 }
 
 /**
- * Vehicles included at no charge, on every plan. A Premium customer with five
- * vehicles pays for four.
+ * Vehicles included at no charge once billing is live. A Premium customer
+ * with five vehicles pays for three.
  *
- * Must match `free_vehicles()` in 0014. Postgres is the authority: the
- * browser can be edited, the database cannot.
+ * Must match the non-beta branch of `free_vehicles()` in 0015. Postgres is
+ * the authority: the browser can be edited, the database cannot.
  */
-export const FREE_VEHICLES = 1;
+// Typed as number, not the literal 2: the singular/plural copy branches on
+// this value, and a literal type makes TypeScript reject those comparisons.
+export const FREE_VEHICLES: number = 2;
 
 /**
  * Pricing follows the category: per vehicle, per month. AI usage is metered
@@ -34,9 +36,9 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
     name: "Premium",
     price: 5,
     perVehicle: true,
-    blurb: "Grow past one vehicle. Pay only for the extras.",
+    blurb: "Grow past two vehicles. Pay only for the extras.",
     features: [
-      `First vehicle free, then $5 per vehicle per month`,
+      `First ${FREE_VEHICLES} vehicles free, then $5 per vehicle per month`,
       "AI predictive maintenance across your whole fleet",
       "Email reminders 7 days and 3 days before each service",
       "Add or remove vehicles anytime — no contract, cancel in one click",

@@ -7,8 +7,13 @@
 --
 -- The switch lives here rather than in an environment variable because it has
 -- to govern two things that must never disagree: what the interface offers,
--- and what the database allows. Hiding the checkout button alone would leave
--- beta users capped at one vehicle with no way to add a second.
+-- and what the database allows.
+--
+-- Allowances:  beta = 1 vehicle,  live = 2 vehicles.
+-- Note the beta allowance is the tighter one, and during beta there is no
+-- checkout — so a beta user who needs a second vehicle has no self-service
+-- route. Raise it for them with:
+--   update public.app_config set beta_vehicle_limit = 5;
 --
 -- To start charging:  update public.app_config set beta_mode = false;
 -- To go back:         update public.app_config set beta_mode = true;
@@ -18,14 +23,17 @@ create table if not exists public.app_config (
   -- second configuration row cannot be inserted.
   singleton boolean primary key default true check (singleton),
   beta_mode boolean not null default true,
-  -- Vehicles a free account may add while in beta. Generous on purpose: a
-  -- beta that cannot hold a real fleet teaches you nothing about the product.
-  beta_vehicle_limit integer not null default 25,
+  -- Vehicles a free account may add while in beta.
+  beta_vehicle_limit integer not null default 1,
   updated_at timestamptz not null default now()
 );
 
 insert into public.app_config (singleton) values (true)
 on conflict (singleton) do nothing;
+
+-- Idempotent: re-running this file resets the intended values even if the
+-- row already exists from an earlier run.
+update public.app_config set beta_mode = true, beta_vehicle_limit = 1;
 
 alter table public.app_config enable row level security;
 
@@ -45,7 +53,7 @@ revoke all on function public.beta_mode() from public;
 grant execute on function public.beta_mode() to authenticated;
 
 -- Vehicles included at no charge. In beta everyone gets the beta allowance;
--- afterwards it drops to the one free vehicle the pricing promises.
+-- once billing opens the free tier is two vehicles.
 -- No longer immutable: it reads configuration, so it must be stable.
 create or replace function public.free_vehicles()
 returns integer
@@ -54,8 +62,8 @@ set search_path = public
 as $$
   select case
     when public.beta_mode()
-      then coalesce((select beta_vehicle_limit from app_config limit 1), 25)
-    else 1
+      then coalesce((select beta_vehicle_limit from app_config limit 1), 1)
+    else 2
   end;
 $$;
 
