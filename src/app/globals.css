@@ -59,7 +59,7 @@ body {
 }
 
 /* Primary action in the brand colour — used for every main call to action
-   so the app reads as Fleet Wise rather than generic black-and-white. */
+   so the app reads as MotorWise rather than generic black-and-white. */
 .btn-brand {
   background: var(--brand);
   color: var(--brand-ink);
