@@ -21,7 +21,7 @@ export function whopBase(): string {
 }
 
 export function whopConfigured(): boolean {
-  return Boolean(process.env.WHOP_API_KEY && process.env.WHOP_COMPANY_ID);
+  return whopMissingConfig().length === 0;
 }
 
 /** What is missing, named exactly — a generic "not configured" costs hours. */
@@ -29,6 +29,8 @@ export function whopMissingConfig(): string[] {
   const missing: string[] = [];
   if (!process.env.WHOP_API_KEY) missing.push("WHOP_API_KEY");
   if (!process.env.WHOP_COMPANY_ID) missing.push("WHOP_COMPANY_ID");
+  // Not optional: a renewal plan cannot be created without a product.
+  if (!process.env.WHOP_PRODUCT_ID) missing.push("WHOP_PRODUCT_ID");
   return missing;
 }
 
@@ -51,6 +53,24 @@ async function whopFetch(
     // A non-JSON body from Whop is itself the diagnostic; keep the status.
   }
   return { ok: res.ok, status: res.status, json };
+}
+
+/**
+ * Pull the human-readable reason out of a Whop error body.
+ *
+ * Whop nests it as {"error":{"type":..,"message":..}}, so treating `error` as
+ * a string — the shape most APIs use — silently discards the one sentence
+ * that says what went wrong.
+ */
+function whopError(json: Record<string, unknown>, status: number): string {
+  const err = json.error;
+  if (err && typeof err === "object") {
+    const message = (err as Record<string, unknown>).message;
+    if (typeof message === "string" && message) return message;
+  }
+  if (typeof err === "string" && err) return err;
+  if (typeof json.message === "string" && json.message) return json.message;
+  return `Whop returned HTTP ${status}.`;
 }
 
 export interface CheckoutSession {
@@ -77,15 +97,23 @@ export async function createCheckoutSession(params: {
   | { ok: false; status: number; error: string }
 > {
   const body: Record<string, unknown> = {
-    company_id: process.env.WHOP_COMPANY_ID,
+    // company_id belongs INSIDE plan, and must NOT also appear at the top
+    // level: with an inline plan Whop rejects the outer one outright
+    // ("Cannot provide company_id for this configuration"). Both facts came
+    // from the API, not the docs.
     plan: {
+      company_id: process.env.WHOP_COMPANY_ID,
       plan_type: "renewal",
-      billing_period: "monthly",
+      // Days, not a period name. "monthly" is rejected as a missing
+      // parameter rather than an invalid one, which is a confusing way to
+      // find out.
+      billing_period: 30,
       renewal_price: params.monthlyPrice,
       currency: "usd",
-      ...(process.env.WHOP_ACCESS_PASS_ID && {
-        access_pass_id: process.env.WHOP_ACCESS_PASS_ID,
-      }),
+      // Required for a renewal plan, and named product_id — not
+      // access_pass_id, which Whop's own docs use for the same object and
+      // which this endpoint rejects outright.
+      product_id: process.env.WHOP_PRODUCT_ID,
     },
     metadata: {
       org_id: params.orgId,
@@ -103,11 +131,7 @@ export async function createCheckoutSession(params: {
   });
 
   if (!ok) {
-    const error =
-      (typeof json.error === "string" && json.error) ||
-      (typeof json.message === "string" && json.message) ||
-      `Whop rejected the checkout (HTTP ${status}).`;
-    return { ok: false, status, error };
+    return { ok: false, status, error: whopError(json, status) };
   }
 
   const sessionId = typeof json.id === "string" ? json.id : null;
@@ -144,8 +168,5 @@ export async function cancelMembership(
     { method: "POST", body: { cancellation_mode: "immediate" } }
   );
   if (ok) return { ok: true };
-  const error =
-    (typeof json.error === "string" && json.error) ||
-    `HTTP ${status} cancelling membership ${membershipId}`;
-  return { ok: false, error };
+  return { ok: false, error: whopError(json, status) };
 }
