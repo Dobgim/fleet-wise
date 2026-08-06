@@ -43,25 +43,39 @@ function verifySignature(
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
   if (!Number.isFinite(age) || age > 300) return false;
 
-  // Standard Webhooks secrets are "whsec_" + base64. Whop's own examples
-  // base64-encode the raw string instead, so accept both rather than fail
-  // verification on a formatting difference.
-  const key = secret.startsWith("whsec_")
-    ? Buffer.from(secret.slice("whsec_".length), "base64")
-    : Buffer.from(secret, "utf8");
+  // How the secret becomes HMAC key bytes is the one thing here with no
+  // authoritative answer. Standard Webhooks says "whsec_" + base64; Whop
+  // issues a "ws_"-prefixed secret and its SDK does btoa(secret), which makes
+  // the key the raw string INCLUDING the prefix. Every plausible reading is
+  // tried rather than betting the entire payment flow on one, since the
+  // failure mode is silent: valid purchases rejected as forgeries.
+  const keys: Buffer[] = [];
+  if (secret.startsWith("whsec_")) {
+    keys.push(Buffer.from(secret.slice("whsec_".length), "base64"));
+  }
+  keys.push(Buffer.from(secret, "utf8"));
+  const underscore = secret.indexOf("_");
+  if (underscore !== -1) {
+    keys.push(Buffer.from(secret.slice(underscore + 1), "utf8"));
+  }
 
-  const expected = crypto
-    .createHmac("sha256", key)
-    .update(`${id}.${timestamp}.${rawBody}`)
-    .digest("base64");
-
+  const signed = `${id}.${timestamp}.${rawBody}`;
   // The header may carry several space-separated versioned signatures during
   // a secret rotation; any one matching is a pass.
-  return signature.split(" ").some((part) => {
-    const value = part.startsWith("v1,") ? part.slice(3) : part;
-    const a = Buffer.from(value);
+  const provided = signature
+    .split(" ")
+    .map((part) => (part.startsWith("v1,") ? part.slice(3) : part));
+
+  return keys.some((key) => {
+    const expected = crypto
+      .createHmac("sha256", key)
+      .update(signed)
+      .digest("base64");
     const b = Buffer.from(expected);
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
+    return provided.some((value) => {
+      const a = Buffer.from(value);
+      return a.length === b.length && crypto.timingSafeEqual(a, b);
+    });
   });
 }
 
@@ -227,12 +241,18 @@ export async function POST(request: Request) {
   const data = pick(event, "data") ?? event;
 
   try {
+    // Whop's dashboard lists these underscored (membership_activated) while
+    // its docs write them dotted (membership.activated). Both are accepted
+    // rather than picking a side, because an unmatched event is silently
+    // ignored — a paid customer left on Free with nothing in the log.
     switch (type) {
+      case "membership_activated":
       case "membership.activated":
       case "membership_went_valid":
         await applyMembership(data, true);
         break;
 
+      case "membership_deactivated":
       case "membership.deactivated":
       case "membership_went_invalid":
         await applyMembership(data, false);
@@ -242,6 +262,11 @@ export async function POST(request: Request) {
         // Whop sends many event types; ignore the ones we do not act on.
         // payment.succeeded needs no handling: the membership events already
         // carry the entitlement, and acting on both would double-process.
+        //
+        // Logged, not silent. If Whop renames an event, the symptom is a
+        // customer who paid and stayed on Free — and the only way to tell
+        // that from "nobody bought anything" is a line here.
+        console.log("whop event ignored", type);
         break;
     }
   } catch (err) {
