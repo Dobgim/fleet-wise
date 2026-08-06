@@ -58,12 +58,6 @@ export interface AiBudget {
   freeVehicles: number;
   /** Premium only: vehicles paid for, i.e. beyond the free allowance. */
   seats: number | null;
-  /**
-   * True while the product is free for everyone. Set in the database
-   * (app_config.beta_mode) so the interface and the enforced limits can
-   * never disagree.
-   */
-  beta: boolean;
 }
 
 export interface FleetData {

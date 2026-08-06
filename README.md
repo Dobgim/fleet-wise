@@ -10,7 +10,7 @@ cost/maintenance dashboard, and an AI copilot grounded in the org's own data.
 - **Auth:** Clerk (sign-in, email verification, 2FA) — see `CLERK-SETUP.md`
 - **Backend/DB:** Supabase (Postgres, Storage) with Row-Level Security as the
   tenant-isolation source of truth, trusting Clerk session tokens
-- **Payments:** Paddle subscriptions (merchant of record)
+- **Payments:** Whop subscriptions (merchant of record)
 - **Email:** Resend · **Analytics:** PostHog · **Hosting:** Vercel + Supabase
 
 ## Setup

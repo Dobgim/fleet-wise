@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             <strong>Resend</strong> — delivers reminder and account emails.
           </li>
           <li>
-            <strong>Paddle</strong> — our merchant of record; processes payments
+            <strong>Whop</strong> — our merchant of record; processes payments
             and holds billing information.
           </li>
         </ul>

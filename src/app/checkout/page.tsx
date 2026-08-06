@@ -1,0 +1,77 @@
+"use client";
+
+import Link from "next/link";
+import Script from "next/script";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+
+/**
+ * Hosts Whop's embedded checkout.
+ *
+ * Whop has no hosted checkout URL to redirect to — payment is an embed that
+ * mounts into a div on our own page — so the flow is: /pricing creates a
+ * session server-side, sends the browser here with its id, and Whop's loader
+ * script renders the card form. Card details never touch this app.
+ */
+const LOADER = "https://js.whop.com/static/checkout/loader.js";
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={<p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>}
+    >
+      <Checkout />
+    </Suspense>
+  );
+}
+
+function Checkout() {
+  const params = useSearchParams();
+  const session = params.get("session");
+  const plan = params.get("plan");
+
+  if (!session) {
+    return (
+      <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 p-6">
+        <h1 className="text-xl font-bold">Nothing to pay for</h1>
+        <p className="text-sm text-[var(--text-secondary)]">
+          This page needs a checkout started from the pricing page.
+        </p>
+        <Link href="/pricing" className="btn-brand rounded-md px-4 py-2 text-sm">
+          Back to pricing
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-2xl flex-1 space-y-4 p-4 sm:p-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Checkout</h1>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          Payment is handled by Whop. Your card details never reach MotorWise.
+        </p>
+      </div>
+
+      <div
+        className="rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800"
+        data-whop-checkout-session={session}
+        {...(plan && { "data-whop-checkout-plan-id": plan })}
+        data-whop-checkout-theme="system"
+      >
+        <p className="text-sm text-[var(--text-muted)]">Loading payment form…</p>
+      </div>
+
+      <Link
+        href="/pricing"
+        className="inline-block text-sm text-[var(--text-secondary)] underline"
+      >
+        Cancel and go back
+      </Link>
+
+      {/* afterInteractive, not beforeInteractive: the div above must exist in
+          the DOM before Whop's loader looks for it. */}
+      <Script src={LOADER} strategy="afterInteractive" />
+    </main>
+  );
+}

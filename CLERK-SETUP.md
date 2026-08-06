@@ -89,7 +89,7 @@ if this has already happened to you.
 
 ## 5 · Set up the Clerk webhook
 
-The nightly reminder job and the Paddle receipt email both need an email
+The nightly reminder job and the Whop receipt email both need an email
 address for a user, and Postgres needs to know whether a user has 2FA on.
 Neither can ask Clerk directly, so Clerk pushes changes to us.
 

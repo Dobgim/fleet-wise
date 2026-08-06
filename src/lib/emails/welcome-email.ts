@@ -37,13 +37,19 @@ function step(n: number, title: string, body: string): string {
 export function buildWelcomeEmail(params: {
   firstName?: string | null;
   freeVehicles: number;
-  beta: boolean;
+  pricePerVehicle: number;
   siteUrl: string;
   logoUrl: string;
   supportEmail: string;
 }): { subject: string; html: string } {
-  const { firstName, freeVehicles, beta, siteUrl, logoUrl, supportEmail } =
-    params;
+  const {
+    firstName,
+    freeVehicles,
+    pricePerVehicle,
+    siteUrl,
+    logoUrl,
+    supportEmail,
+  } = params;
 
   // A bare "Welcome" is what every other SaaS sends. Naming the first action
   // in the subject line is what gets it opened.
@@ -55,12 +61,9 @@ export function buildWelcomeEmail(params: {
 
   const vehicleWord = freeVehicles === 1 ? "vehicle" : "vehicles";
 
-  // During the beta everything is free, so promising "no card required" is
-  // true and worth saying. Once billing is on, the same sentence would be a
-  // lie — hence the branch rather than fixed copy.
-  const planLine = beta
-    ? `You're on the <b>free beta</b>: ${freeVehicles} ${vehicleWord}, no card, no time limit. When paid plans arrive you'll hear from us first.`
-    : `Your account includes ${freeVehicles} ${vehicleWord} free. Add more whenever you need them at $5 per vehicle per month.`;
+  // "No card" is worth saying plainly: the commonest reason a signup never
+  // becomes a first vehicle is a suspicion that a bill is waiting.
+  const planLine = `Your account includes <b>${freeVehicles} ${vehicleWord} free</b> — no card, no time limit. Add more whenever you need them at $${pricePerVehicle} per vehicle per month, and cancel in one click.`;
 
   const html = `
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f4f4f2;padding:32px 16px;">

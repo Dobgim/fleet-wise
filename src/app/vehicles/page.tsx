@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { formatMoney } from "@/lib/insights";
-import { billableVehicles, PLANS } from "@/lib/plans";
+import {
+  billableVehicles,
+  FREE_VEHICLES,
+  monthlyCost,
+  PLANS,
+} from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { Vehicle } from "@/lib/types";
 
@@ -48,6 +54,7 @@ export default function VehiclesPage() {
     clearAllData,
     applyBudget,
   } = useFleet();
+  const router = useRouter();
   const [form, setForm] = useState(EMPTY);
   const [seatBusy, setSeatBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -78,52 +85,43 @@ export default function VehiclesPage() {
   /**
    * Buy one more vehicle on Premium.
    *
-   * Two calls on purpose: the first prices the change, the second applies it.
-   * Nobody should discover a charge on their statement that they never
-   * agreed to — so the exact prorated amount is shown and confirmed first.
+   * Whop cannot change the price of a running subscription — it has no
+   * quantity — so growing the plan means checking out a replacement priced
+   * for the larger fleet. The webhook cancels the subscription it supersedes
+   * the moment the new one activates, so nobody is billed twice.
    */
   const addSeat = async () => {
     setError("");
+
+    // seats counts vehicles PAID FOR, i.e. beyond the free allowance.
+    const paidFor = budget.seats ?? billableVehicles(vehicles.length);
+    const fleet = FREE_VEHICLES + paidFor + 1;
+    const cost = monthlyCost("pro", fleet);
+
+    if (
+      !window.confirm(
+        `Add one vehicle to your plan?\n\nYour subscription becomes $${cost}/month for ${paidFor + 1} paid vehicle${paidFor + 1 === 1 ? "" : "s"}. Your current subscription is cancelled automatically once the new one starts, so you are never charged twice.`
+      )
+    )
+      return;
+
     setSeatBusy(true);
     try {
-      // seats counts vehicles PAID FOR, i.e. beyond the free allowance.
-      const quantity = (budget.seats ?? billableVehicles(vehicles.length)) + 1;
-      const pre = await fetch("/api/subscription", {
+      const res = await fetch("/api/whop/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "pro", quantity, preview: true }),
+        body: JSON.stringify({ plan: "pro", fleet }),
       });
-      const preview = await pre.json();
-      if (!pre.ok) {
-        setError(
-          pre.status === 409
-            ? "No active subscription found. Choose a plan on the Pricing page."
-            : (preview.error ?? "Couldn't price that change.")
-        );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.sessionId) {
+        setError(data.error ?? "Couldn't start checkout. Please try again.");
         return;
       }
-
-      const money = preview.charge as
-        | { amount: number; currency: string; negative: boolean }
-        | null;
-      const line = money
-        ? `You'll be charged ${money.currency} ${money.amount.toFixed(2)} now for the rest of this billing period, then $${quantity * PLANS.pro.price}/month for ${quantity} paid vehicle${quantity === 1 ? "" : "s"}.`
-        : `Your plan will move to ${quantity} vehicles.`;
-      if (!window.confirm(`Add one vehicle to your plan?\n\n${line}`)) return;
-
-      const res = await fetch("/api/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "pro", quantity }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Couldn't update your subscription.");
-        return;
-      }
-      await refreshOrg();
+      const query = new URLSearchParams({ session: data.sessionId });
+      if (data.planId) query.set("plan", data.planId);
+      router.push(`/checkout?${query.toString()}`);
     } catch {
-      setError("Couldn't update your subscription. Nothing was charged.");
+      setError("Couldn't start checkout. Nothing was charged.");
     } finally {
       setSeatBusy(false);
     }
@@ -135,9 +133,7 @@ export default function VehiclesPage() {
       setError(
         budget.plan === "pro"
           ? `Your plan covers ${budget.vehicleLimit} vehicles. Add one to make room.`
-          : budget.beta
-            ? `The free beta covers ${budget.freeVehicles} vehicles.`
-            : `Free covers ${budget.freeVehicles} vehicles — add a paid vehicle to go further.`
+          : `Free covers ${budget.freeVehicles} vehicles — add a paid vehicle to go further.`
       );
       return;
     }
@@ -290,12 +286,6 @@ export default function VehiclesPage() {
                   ? "Updating…"
                   : `Add a vehicle to my plan (+$${PLANS.pro.price}/mo)`}
               </button>
-            </>
-          ) : budget.beta ? (
-            <>
-              You&apos;ve reached the {budget.freeVehicles}-vehicle limit of the
-              free beta. Email us if you need more — while MotorWise is in beta
-              we can raise it for you at no cost.
             </>
           ) : (
             <>

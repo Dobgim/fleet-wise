@@ -15,15 +15,6 @@ import {
   planLabel,
   type PaidPlanId,
 } from "@/lib/plans";
-import { openPaddleCheckout, paddleEnabled } from "@/lib/paddle-client";
-
-const PADDLE_PRICE: Record<string, string | undefined> = {
-  pro: process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO,
-  business: process.env.NEXT_PUBLIC_PADDLE_PRICE_BUSINESS,
-};
-
-const BILLING_LIVE =
-  paddleEnabled() && Boolean(PADDLE_PRICE.pro && PADDLE_PRICE.business);
 
 export default function PricingPage() {
   return (
@@ -54,12 +45,8 @@ function Pricing() {
 
   const effective = budget.plan;
   const subscribed = effective === "pro" || effective === "business";
-  // Set in the database (app_config.beta_mode) — the same switch that sets
-  // the vehicle allowance, so the price shown and the limit enforced can
-  // never disagree.
-  const beta = budget.beta;
 
-  // Returning from checkout. Paddle sends the browser back within about a
+  // Returning from checkout. Whop sends the browser back within about a
   // second, but the plan is granted asynchronously by the webhook — so poll
   // for it rather than showing whatever the page happened to load with.
   useEffect(() => {
@@ -107,113 +94,60 @@ function Pricing() {
 
   const signedIn = Boolean(userEmail);
 
-  /** Vehicles to bill for at a given fleet size — the Paddle quantity. */
-  const quantityFor = (id: PaidPlanId, size: number) =>
-    PLANS[id].perVehicle ? Math.max(1, billableVehicles(size)) : 1;
-
+  /**
+   * Start a checkout.
+   *
+   * Whop has no per-unit quantity, so a per-vehicle plan is sold as a single
+   * plan priced at $5 x billable vehicles, created server-side. Changing
+   * vehicle count later therefore means buying a replacement subscription —
+   * the webhook cancels the one it supersedes, so nobody is billed twice.
+   */
   const startCheckout = async (id: PaidPlanId) => {
     setNotice("");
     setError("");
-    // Say which of the two things is missing. "Not available right now"
-    // sent us hunting through Paddle when the real cause was a workspace
-    // that had failed to be created.
-    const priceId = PADDLE_PRICE[id];
-    if (!priceId) {
-      setError(
-        "Checkout isn't configured yet — the price for this plan is missing. (Set NEXT_PUBLIC_PADDLE_PRICE_PRO and NEXT_PUBLIC_PADDLE_PRICE_BUSINESS, then redeploy.)"
-      );
-      return;
-    }
     if (!orgId) {
       setError(
         "Your workspace hasn't finished setting up, so there's nothing to attach a subscription to. Reload the page — if it keeps happening, contact us."
       );
       return;
     }
-    setBusy(id);
-    try {
-      await openPaddleCheckout({
-        priceId,
-        orgId,
-        quantity: quantityFor(id, fleet),
-        email: userEmail ?? undefined,
-        successUrl: `${window.location.origin}/pricing?checkout=success`,
-        // Paddle reports a rejected checkout asynchronously, after the
-        // overlay has already opened, so this cannot be a thrown error.
-        onError: (message) => {
-          setError(message);
-          setBusy(null);
-        },
-      });
-    } catch {
-      setError("Couldn't open checkout. Please try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
 
-  /**
-   * Already subscribed: change the existing subscription rather than opening
-   * a second checkout, which would bill them twice. The exact prorated amount
-   * is shown and confirmed before anything is charged.
-   */
-  const changeSubscription = async (id: PaidPlanId) => {
-    setNotice("");
-    setError("");
-    setBusy(id);
-    try {
-      const quantity = quantityFor(id, fleet);
-      const pre = await fetch("/api/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: id, quantity, preview: true }),
-      });
-      const preview = await pre.json();
-
-      if (pre.status === 409) {
-        await startCheckout(id);
-        return;
-      }
-      if (!pre.ok) {
-        setError(preview.error ?? "Couldn't price that change.");
-        return;
-      }
-
-      const money = preview.charge as
-        | { amount: number; currency: string; negative: boolean }
-        | null;
-      const line = money
-        ? money.negative || money.amount === 0
-          ? `You'll be credited ${money.currency} ${money.amount.toFixed(2)} toward your next bill.`
-          : `You'll be charged ${money.currency} ${money.amount.toFixed(2)} now for the rest of this billing period.`
-        : "Your subscription will be updated.";
-
+    if (subscribed) {
       const what = PLANS[id].perVehicle
-        ? `${PLANS[id].name} for ${fleet} vehicles (${quantity} charged)`
-        : PLANS[id].name;
-      if (!window.confirm(`Switch to ${what}?\n\n${line}`)) return;
+        ? `${PLANS[id].name} covering ${fleet} vehicles — $${monthlyCost(id, fleet)}/month`
+        : `${PLANS[id].name} — $${PLANS[id].price}/month`;
+      // Said plainly before any money moves: this replaces, it does not add.
+      if (
+        !window.confirm(
+          `Switch to ${what}?\n\nYour current subscription is cancelled automatically once the new one starts, so you are never charged twice.`
+        )
+      )
+        return;
+    }
 
-      const res = await fetch("/api/subscription", {
+    setBusy(id);
+    try {
+      const res = await fetch("/api/whop/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: id, quantity }),
+        body: JSON.stringify({ plan: id, fleet }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Couldn't update your subscription.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.sessionId) {
+        setError(data.error ?? "Couldn't start checkout. Please try again.");
         return;
       }
-      await refreshOrg();
-      setNotice(`Updated — you're on ${PLANS[id].name}.`);
+      const query = new URLSearchParams({ session: data.sessionId });
+      if (data.planId) query.set("plan", data.planId);
+      router.push(`/checkout?${query.toString()}`);
     } catch {
-      setError("Couldn't update your subscription. Nothing was charged.");
+      setError("Couldn't start checkout. Please try again.");
     } finally {
       setBusy(null);
     }
   };
 
-  const choose = (id: PaidPlanId) =>
-    subscribed ? changeSubscription(id) : startCheckout(id);
+  const choose = (id: PaidPlanId) => startCheckout(id);
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 p-4 sm:p-6">
@@ -253,18 +187,6 @@ function Pricing() {
         </div>
       )}
 
-      {beta && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm"
-          style={{ borderColor: "var(--brand)", background: "var(--brand-soft)" }}
-        >
-          <b>MotorWise is free while in beta.</b> Everything below is what it
-          will cost when billing opens — nothing is charged today, and you
-          keep {budget.freeVehicles} vehicles free in the meantime. We&apos;ll
-          email you well before anything changes.
-        </div>
-      )}
-
       {/* ---- Free tier: stated plainly, not sold ---- */}
       <section
         className="rounded-xl border p-5"
@@ -276,11 +198,9 @@ function Pricing() {
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">
-            {beta
-              ? `Free beta — up to ${budget.freeVehicles} vehicles`
-              : FREE_VEHICLES === 1
-                ? "Free — 1 vehicle"
-                : `Free — up to ${FREE_VEHICLES} vehicles`}
+            {FREE_VEHICLES === 1
+              ? "Free — 1 vehicle"
+              : `Free — up to ${FREE_VEHICLES} vehicles`}
           </h2>
           {effective === "free" && (
             <span className="btn-brand rounded-full px-2.5 py-0.5 text-xs font-medium">
@@ -393,13 +313,9 @@ function Pricing() {
                 ))}
               </ul>
 
-              {signedIn && beta ? (
-                <div className="mt-5 rounded-md border border-neutral-300 px-4 py-2 text-center text-sm text-[var(--text-secondary)] dark:border-neutral-700">
-                  Free during beta
-                </div>
-              ) : signedIn ? (
+              {signedIn ? (
                 <button
-                  disabled={!BILLING_LIVE || busy !== null}
+                  disabled={busy !== null}
                   onClick={() => choose(id)}
                   className="btn-brand mt-5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
@@ -418,7 +334,7 @@ function Pricing() {
                   href="/signup"
                   className="btn-brand mt-5 rounded-md px-4 py-2 text-center text-sm font-medium"
                 >
-                  {beta ? "Join the free beta" : "Start free"}
+                  Start free
                 </Link>
               )}
             </section>
@@ -432,7 +348,7 @@ function Pricing() {
         subject to fair use; we will contact you long before it ever becomes an
         issue.
         {subscribed &&
-          " To update your card or cancel, use the manage-subscription link in your Paddle receipt email."}
+          " To update your card or cancel, use the manage-subscription link in your Whop receipt email."}
       </p>
     </main>
   );

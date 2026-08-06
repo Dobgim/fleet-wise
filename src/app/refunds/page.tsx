@@ -55,8 +55,8 @@ export default function RefundsPage() {
           We aim to reply within two business days.
         </p>
         <p>
-          Payments are processed by Paddle as merchant of record, so refunds are
-          issued through Paddle and returned to the original payment method.
+          Payments are processed by Whop as merchant of record, so refunds are
+          issued through Whop and returned to the original payment method.
           Depending on your bank, the money can take a few days to appear.
         </p>
       </Section>

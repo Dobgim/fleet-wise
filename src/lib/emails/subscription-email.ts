@@ -3,7 +3,7 @@ import { FREE_VEHICLES, PLANS, type PaidPlanId } from "../plans";
 /**
  * Sent by us when a subscription becomes active.
  *
- * This is NOT the invoice — Paddle is the merchant of record and emails the
+ * This is NOT the invoice — Whop is the merchant of record and emails the
  * official receipt with a PDF invoice itself. This is the brand's own
  * welcome: what the customer just unlocked, and where to go next.
  */
@@ -66,7 +66,7 @@ export function buildSubscriptionEmail(params: {
         </a>
       </td></tr>
       <tr><td style="border-top:1px solid #e1e0d9;padding-top:18px;font-size:12px;line-height:1.6;color:#898781;">
-        Your invoice is emailed separately by <b>Paddle</b>, which handles
+        Your invoice is emailed separately by <b>Whop</b>, which handles
         billing for MotorWise. Use the link in that receipt to update your
         card or cancel at any time.<br /><br />
         &mdash; The MotorWise team

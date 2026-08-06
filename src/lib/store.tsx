@@ -77,7 +77,6 @@ function emptyBudget(limit = 0): AiBudget {
     vehicleLimit: FREE_VEHICLES,
     freeVehicles: FREE_VEHICLES,
     seats: null,
-    beta: false,
   };
 }
 
@@ -140,7 +139,7 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Re-read the organization. Needed after checkout: Paddle returns the
+   * Re-read the organization. Needed after checkout: Whop returns the
    * browser here within a second, but the plan is granted asynchronously by
    * the webhook, so the page must look again rather than trust what it
    * loaded with.

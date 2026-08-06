@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { buildWelcomeEmail } from "@/lib/emails/welcome-email";
 import { SUPPORT_EMAIL } from "@/lib/company";
+import { FREE_VEHICLES, PLANS } from "@/lib/plans";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -36,18 +37,11 @@ async function sendWelcomeEmail(
   if (claimError) throw claimError;
   if (!claimed?.length) return; // already sent, or another delivery won
 
-  const { data: config } = await admin
-    .from("app_config")
-    .select("beta_mode, beta_vehicle_limit")
-    .maybeSingle();
-  const beta = config?.beta_mode ?? false;
-  const freeVehicles = beta ? (config?.beta_vehicle_limit ?? 1) : 2;
-
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://motorwise.co";
   const { subject, html } = buildWelcomeEmail({
     firstName,
-    freeVehicles,
-    beta,
+    freeVehicles: FREE_VEHICLES,
+    pricePerVehicle: PLANS.pro.price,
     siteUrl,
     logoUrl: `${siteUrl}/logo.png`,
     supportEmail: SUPPORT_EMAIL,

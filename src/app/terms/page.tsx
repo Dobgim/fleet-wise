@@ -57,10 +57,10 @@ export default function TermsPage() {
           made. Removing vehicles reduces the price from the next renewal.
         </p>
         <p>
-          <strong>Payments are processed by Paddle</strong>, which acts as the
-          merchant of record for all purchases. Paddle handles billing, payment
+          <strong>Payments are processed by Whop</strong>, which acts as the
+          merchant of record for all purchases. Whop handles billing, payment
           and applicable sales tax, and its terms apply to the transaction. Your
-          receipt comes from Paddle and includes a link to manage or cancel your
+          receipt comes from Whop and includes a link to manage or cancel your
           subscription.
         </p>
         <p>
