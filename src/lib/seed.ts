@@ -20,12 +20,12 @@ export function buildSeedData(): FleetData {
   const now = new Date().toISOString();
 
   const vehicles: Vehicle[] = [
-    { id: "v1", registration: "TRK-012", vin: "1FTFW1ET5DFC10312", make: "Ford", model: "F-150", mileage: 148_200, createdAt: now },
-    { id: "v2", registration: "VAN-101", vin: "WD3PE7CC5E5831044", make: "Mercedes", model: "Sprinter", mileage: 96_400, createdAt: now },
-    { id: "v3", registration: "VAN-102", vin: "WD3PE7CC1F5902113", make: "Mercedes", model: "Sprinter", mileage: 88_750, createdAt: now },
-    { id: "v4", registration: "CAR-201", vin: "JTDBR32E720045678", make: "Toyota", model: "Corolla", mileage: 62_300, createdAt: now },
-    { id: "v5", registration: "CAR-202", vin: "JTDBR32E720099887", make: "Toyota", model: "Hilux", mileage: 121_900, createdAt: now },
-    { id: "v6", registration: "TRK-014", vin: "1FDUF5GT4EEB44821", make: "Ford", model: "F-450", mileage: 173_500, createdAt: now },
+    { id: "v1", registration: "TRK-012", vin: "1FTFW1ET5DFC10312", make: "Ford", model: "F-150", mileage: 148_200, createdAt: now , remindersEnabled: true },
+    { id: "v2", registration: "VAN-101", vin: "WD3PE7CC5E5831044", make: "Mercedes", model: "Sprinter", mileage: 96_400, createdAt: now , remindersEnabled: true },
+    { id: "v3", registration: "VAN-102", vin: "WD3PE7CC1F5902113", make: "Mercedes", model: "Sprinter", mileage: 88_750, createdAt: now , remindersEnabled: true },
+    { id: "v4", registration: "CAR-201", vin: "JTDBR32E720045678", make: "Toyota", model: "Corolla", mileage: 62_300, createdAt: now , remindersEnabled: true },
+    { id: "v5", registration: "CAR-202", vin: "JTDBR32E720099887", make: "Toyota", model: "Hilux", mileage: 121_900, createdAt: now , remindersEnabled: true },
+    { id: "v6", registration: "TRK-014", vin: "1FDUF5GT4EEB44821", make: "Ford", model: "F-450", mileage: 173_500, createdAt: now , remindersEnabled: true },
   ];
 
   let i = 0;

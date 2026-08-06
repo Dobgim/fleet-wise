@@ -93,6 +93,8 @@ function toVehicle(row: any): Vehicle {
     model: row.model,
     mileage: Number(row.mileage),
     createdAt: row.created_at,
+    // Defaults on for rows written before 0021, matching the column default.
+    remindersEnabled: row.reminders_enabled ?? true,
   };
 }
 
@@ -324,6 +326,9 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           ...(patch.make !== undefined && { make: patch.make }),
           ...(patch.model !== undefined && { model: patch.model }),
           ...(patch.mileage !== undefined && { mileage: patch.mileage }),
+          ...(patch.remindersEnabled !== undefined && {
+            reminders_enabled: patch.remindersEnabled,
+          }),
         })
         .eq("id", id)
         .then(({ error }) => {

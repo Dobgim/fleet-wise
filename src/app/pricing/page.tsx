@@ -8,7 +8,7 @@ import {
   billableVehicles,
   BUSINESS_BREAK_EVEN,
   BUSINESS_VEHICLES,
-  exceedsBusiness,
+  exceedsPlan,
   FREE_VEHICLES,
   isCheaperOnBusiness,
   monthlyCost,
@@ -296,26 +296,30 @@ function Pricing() {
               <p className="mt-4">
                 <span className="text-3xl font-bold">${p.price}</span>
                 <span className="text-sm text-[var(--text-muted)]">
-                  {p.perVehicle ? " per extra vehicle / month" : " /month flat"}
+                  {p.perVehicle
+                    ? " per extra vehicle / month"
+                    : ` /${p.per} flat`}
                 </span>
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 {p.perVehicle
                   ? `${fleet} vehicles → $${cost}/month`
-                  : `Up to ${BUSINESS_VEHICLES} vehicles → $${cost}/month`}
+                  : `Up to ${p.vehicles} vehicles → $${cost}/${p.per}`}
               </p>
               {!p.perVehicle &&
-                (exceedsBusiness(fleet) ? (
+                (exceedsPlan(id, fleet) ? (
                   <p
                     className="mt-1 text-xs"
                     style={{ color: "var(--status-critical)" }}
                   >
-                    Business covers {BUSINESS_VEHICLES} vehicles — {fleet} is
-                    too many. Talk to us and we&apos;ll sort something out.
+                    {p.name} covers {p.vehicles} vehicles — {fleet} is too
+                    many. Talk to us and we&apos;ll sort something out.
                   </p>
                 ) : (
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Better value from {BUSINESS_BREAK_EVEN} vehicles up.
+                    {id === "yearly"
+                      ? `$${(p.price / 12).toFixed(2)} a month, paid yearly.`
+                      : `Better value from ${BUSINESS_BREAK_EVEN} vehicles up.`}
                   </p>
                 ))}
 
@@ -331,7 +335,7 @@ function Pricing() {
               {signedIn ? (
                 <button
                   disabled={
-                    busy !== null || (!p.perVehicle && exceedsBusiness(fleet))
+                    busy !== null || (!p.perVehicle && exceedsPlan(id, fleet))
                   }
                   onClick={() => choose(id)}
                   className="btn-brand mt-5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"

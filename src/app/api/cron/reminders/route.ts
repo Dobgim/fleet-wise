@@ -79,12 +79,28 @@ export async function GET(request: Request) {
   for (const org of (orgs ?? []) as OrgRow[]) {
     summary.checked++;
 
-    const [{ data: vehicleRows }, { data: recordRows }] = await Promise.all([
-      supabase.from("vehicles").select("*").eq("org_id", org.id),
-      supabase.from("service_records").select("*").eq("org_id", org.id),
-    ]);
+    const [{ data: vehicleRows }, { data: recordRows }, { data: allowedRows }] =
+      await Promise.all([
+        supabase.from("vehicles").select("*").eq("org_id", org.id),
+        supabase.from("service_records").select("*").eq("org_id", org.id),
+        // Postgres decides which vehicles this org may be emailed about:
+        // the ones the owner chose, capped by the plan. A lapsed
+        // subscription leaves ten vehicles all still marked enabled, so the
+        // cap cannot be trusted from the column alone.
+        supabase.rpc("reminder_vehicle_ids", { org: org.id }),
+      ]);
 
-    const vehicles: Vehicle[] = (vehicleRows ?? []).map((v) => ({
+    const allowed = new Set(
+      ((allowedRows ?? []) as unknown[]).map((row) =>
+        typeof row === "string"
+          ? row
+          : String((row as { reminder_vehicle_ids?: string }).reminder_vehicle_ids)
+      )
+    );
+
+    const vehicles: Vehicle[] = (vehicleRows ?? [])
+      .filter((v) => allowed.has(v.id))
+      .map((v) => ({
       id: v.id,
       registration: v.registration,
       vin: v.vin ?? "",
@@ -92,6 +108,7 @@ export async function GET(request: Request) {
       model: v.model,
       mileage: Number(v.mileage),
       createdAt: v.created_at,
+      remindersEnabled: v.reminders_enabled ?? true,
     }));
     const records: ServiceRecord[] = (recordRows ?? []).map((r) => ({
       id: r.id,

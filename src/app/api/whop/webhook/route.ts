@@ -128,7 +128,9 @@ async function applyMembership(data: unknown, valid: boolean) {
   const membershipId =
     typeof pick(data, "id") === "string" ? (pick(data, "id") as string) : null;
   const paidPlan =
-    metadata?.plan === "pro" || metadata?.plan === "business"
+    metadata?.plan === "pro" ||
+    metadata?.plan === "business" ||
+    metadata?.plan === "yearly"
       ? (metadata.plan as PlanId)
       : null;
   const plan: PlanId = valid && paidPlan ? paidPlan : "free";
@@ -178,7 +180,7 @@ async function applyMembership(data: unknown, valid: boolean) {
         const { subject, html } = buildSubscriptionEmail({
           garageName: before?.name ?? "your garage",
           // `upgraded` is only true for a paid plan, so this narrowing holds.
-          plan: plan as "pro" | "business",
+          plan: plan as Exclude<PlanId, "free">,
           seats,
           siteUrl,
           logoUrl: `${siteUrl}/logo.png`,

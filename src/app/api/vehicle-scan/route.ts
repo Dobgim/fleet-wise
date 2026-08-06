@@ -24,14 +24,29 @@ import { aiBaseUrl, aiChatUrl, aiHeaders, describeAiFailure } from "@/lib/ai";
 const SCAN_MIN_TOKENS = 1500;
 const MAX_IMAGE_BYTES = 4_500_000; // ~4.5MB after base64 decoding
 
+const MAX_IMAGES = 5;
+
+const imageSchema = z
+  .string()
+  .regex(
+    /^data:image\/(jpeg|jpg|png|webp|heic);base64,[A-Za-z0-9+/=]+$/,
+    "Unsupported image format"
+  );
+
+/**
+ * One scan may carry several photos of the SAME vehicle.
+ *
+ * One angle is often not enough: the plate is readable from the front, the
+ * model badge from the back, the mileage only from the dashboard. Sending
+ * them together lets the model corroborate rather than guess, which is the
+ * difference between a form filled correctly and a form filled confidently
+ * with the wrong car.
+ */
 const bodySchema = z.object({
   // data URL: data:image/jpeg;base64,...
-  image: z
-    .string()
-    .regex(
-      /^data:image\/(jpeg|jpg|png|webp|heic);base64,[A-Za-z0-9+/=]+$/,
-      "Unsupported image format"
-    ),
+  images: z.array(imageSchema).min(1).max(MAX_IMAGES).optional(),
+  // Retained so an older client still works.
+  image: imageSchema.optional(),
 });
 
 const SYSTEM_PROMPT = `You read vehicle details from photographs for a vehicle maintenance app.
@@ -86,10 +101,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const base64 = parsed.data.image.split(",")[1] ?? "";
-  if (base64.length * 0.75 > MAX_IMAGE_BYTES) {
+  const images = parsed.data.images ?? (parsed.data.image ? [parsed.data.image] : []);
+  if (images.length === 0) {
     return NextResponse.json(
-      { error: "That image is too large — please use one under 4MB." },
+      { error: "No photo was sent." },
+      { status: 400 }
+    );
+  }
+
+  const totalBytes = images.reduce(
+    (sum, img) => sum + (img.split(",")[1] ?? "").length * 0.75,
+    0
+  );
+  if (totalBytes > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      {
+        error: `Those photos are too large together — keep them under 4MB in total (${images.length} sent).`,
+      },
       { status: 413 }
     );
   }
@@ -120,12 +148,14 @@ export async function POST(request: Request) {
     remaining: number;
     resets_at: string;
   };
-  // Vision costs more than chat, so it needs a larger reserve.
-  if (budget.remaining < SCAN_MIN_TOKENS) {
+  // Vision costs more than chat, so it needs a larger reserve — and each
+  // extra photo is another image to read.
+  const reserve = SCAN_MIN_TOKENS * images.length;
+  if (budget.remaining < reserve) {
     return NextResponse.json(
       {
         error: "quota_exceeded",
-        message: `Reading a photo needs about ${SCAN_MIN_TOKENS.toLocaleString("en-US")} tokens and you have ${budget.remaining.toLocaleString("en-US")} left today. Your budget refills at midnight UTC, or you can fill the form in yourself.`,
+        message: `Reading ${images.length === 1 ? "a photo" : `${images.length} photos`} needs about ${reserve.toLocaleString("en-US")} tokens and you have ${budget.remaining.toLocaleString("en-US")} left today. Your budget refills at midnight UTC, or you can fill the form in yourself.`,
         budget,
       },
       { status: 402 }
@@ -201,12 +231,15 @@ export async function POST(request: Request) {
           content: [
             {
               type: "text",
-              text: "Read this vehicle photo and return the JSON object.",
+              text:
+                images.length === 1
+                  ? "Read this vehicle photo and return the JSON object."
+                  : `These ${images.length} photos are all of the SAME vehicle, from different angles. Combine what you can see across all of them into one JSON object. If two photos disagree about a value, return null for it rather than picking one.`,
             },
-            {
-              type: "image_url",
-              image_url: { url: parsed.data.image, detail: "low" },
-            },
+            ...images.map((url) => ({
+              type: "image_url" as const,
+              image_url: { url, detail: "low" as const },
+            })),
           ],
         },
       ],
@@ -270,6 +303,11 @@ export async function POST(request: Request) {
   const subject = str(fields.subject, 60);
 
   if (!VEHICLE_TYPES.has(imageType)) {
+    // A scan only counts when it actually reads a vehicle. Being told "that
+    // is a dog" is the app working correctly, not a service rendered, and
+    // charging for it would make an allowance of three feel like one.
+    await supabase.rpc("release_scan");
+
     const seen = subject ? `That looks like ${subject}` : "That doesn't look like a vehicle";
     const message =
       imageType === "unclear"

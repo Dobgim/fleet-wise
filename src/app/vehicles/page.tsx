@@ -40,6 +40,9 @@ function fileToScaledDataUrl(file: File, maxDim = 1200): Promise<string> {
 
 const EMPTY = { registration: "", vin: "", make: "", model: "", mileage: "" };
 
+/** Photos of the same vehicle allowed in one scan. Matches MAX_IMAGES on the API. */
+const MAX_SCAN_IMAGES = 5;
+
 export default function VehiclesPage() {
   const {
     ready,
@@ -78,6 +81,14 @@ export default function VehiclesPage() {
 
   // Postgres decides both of these; these copies only shape the button, and
   // the server refuses independently if they are ever wrong.
+  const remindersOn = vehicles.filter((v) => v.remindersEnabled).length;
+  const reminderCap = budget.vehicleLimit ?? vehicles.length;
+  const remindersFull = remindersOn >= reminderCap;
+  // A downgrade leaves more vehicles selected than the new plan covers. The
+  // extras are silently skipped by the cron until the owner chooses, so this
+  // has to say so rather than let reminders quietly stop.
+  const remindersOverCap = remindersOn > reminderCap;
+
   const canScan = budget.scanLimit > 0;
   const outOfScans = canScan && budget.scansRemaining <= 0;
 
@@ -174,6 +185,7 @@ export default function VehiclesPage() {
       make: form.make.trim(),
       model: form.model.trim(),
       mileage,
+      remindersEnabled: true,
     };
     if (editingId) updateVehicle(editingId, payload);
     else addVehicle(payload);
@@ -183,21 +195,29 @@ export default function VehiclesPage() {
   };
 
   const scanPhoto = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = ""; // allow re-picking the same file
-    if (!file) return;
+    if (picked.length === 0) return;
+    // More than five is not refused outright — the extras are simply not
+    // sent, because rejecting a whole selection over a count the user cannot
+    // see while choosing is a poor way to ask for fewer.
+    const files = picked.slice(0, MAX_SCAN_IMAGES);
     setError("");
     setScanNote(null);
     setScanning(true);
     try {
-      const image = await fileToScaledDataUrl(file);
+      const images = await Promise.all(files.map((f) => fileToScaledDataUrl(f)));
       const res = await fetch("/api/vehicle-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image }),
+        body: JSON.stringify({ images }),
       });
       const data = await res.json().catch(() => ({}));
       if (data.budget) applyBudget(data.budget);
+      // The server refunds the scan when a photo turns out not to be a
+      // vehicle, so the count on the button has to come back from it rather
+      // than being decremented optimistically here.
+      await refreshOrg();
       if (!res.ok) {
         const message =
           data.message ??
@@ -355,7 +375,7 @@ export default function VehiclesPage() {
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
+            multiple
             onChange={scanPhoto}
             className="hidden"
           />
@@ -374,17 +394,21 @@ export default function VehiclesPage() {
               Photo scanning is part of the paid plans
             </p>
             <p className="mt-1 text-[var(--text-secondary)]">
-              Point your camera at a vehicle, its number plate, the VIN plate
-              or the odometer, and MotorWise fills this form in for you — no
-              typing, no hunting for where the VIN is stamped.
+              Photograph a vehicle, its number plate, the VIN plate or the
+              odometer — up to {MAX_SCAN_IMAGES} shots of the same vehicle at
+              once — and MotorWise fills this form in for you. Photos that
+              turn out not to be a vehicle don&apos;t use up a scan.
             </p>
             <ul className="mt-2 space-y-1 text-[var(--text-secondary)]">
               <li>
-                <b>{PLANS.pro.name}</b> — {SCAN_LIMITS.pro} photos a day
+                <b>{PLANS.pro.name}</b> — {SCAN_LIMITS.pro} scans a day
               </li>
               <li>
-                <b>{PLANS.business.name}</b> — {SCAN_LIMITS.business} photos a
+                <b>{PLANS.business.name}</b> — {SCAN_LIMITS.business} scans a
                 day
+              </li>
+              <li>
+                <b>{PLANS.yearly.name}</b> — {SCAN_LIMITS.yearly} scans a day
               </li>
             </ul>
             <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -545,6 +569,29 @@ export default function VehiclesPage() {
         </div>
       </form>
 
+      {remindersOverCap && (
+        <div
+          role="alert"
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{
+            borderColor: "var(--status-critical)",
+            background: "var(--status-critical-soft)",
+            color: "var(--status-critical)",
+          }}
+        >
+          <b>
+            Your plan covers reminders for {reminderCap} vehicle
+            {reminderCap === 1 ? "" : "s"}, but {remindersOn} are switched on.
+          </b>{" "}
+          Until you choose, we email about the {reminderCap} oldest and skip
+          the rest. Untick the ones you don&apos;t need, or{" "}
+          <Link href="/pricing" className="underline">
+            add them back to your plan
+          </Link>
+          .
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-[var(--surface-1)] dark:border-neutral-800">
         <table className="w-full text-left text-sm">
           <thead>
@@ -554,6 +601,7 @@ export default function VehiclesPage() {
               <th className="px-4 py-2.5 font-medium">VIN</th>
               <th className="px-4 py-2.5 text-right font-medium">Mileage</th>
               <th className="px-4 py-2.5 text-right font-medium">Total cost</th>
+              <th className="px-4 py-2.5 text-center font-medium">Reminders</th>
               <th className="px-4 py-2.5 text-right font-medium">Actions</th>
             </tr>
           </thead>
@@ -579,6 +627,22 @@ export default function VehiclesPage() {
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">
                   {formatMoney(totalCost(v.id))}
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  <input
+                    type="checkbox"
+                    checked={v.remindersEnabled}
+                    aria-label={`Email reminders for ${v.registration}`}
+                    // Turning one off is always allowed; turning one on is
+                    // refused by Postgres once the plan's allowance is full,
+                    // which is exactly the choice a downgraded customer has
+                    // to make.
+                    disabled={!v.remindersEnabled && remindersFull}
+                    onChange={(e) =>
+                      updateVehicle(v.id, { remindersEnabled: e.target.checked })
+                    }
+                    className="h-4 w-4 accent-neutral-900 dark:accent-white disabled:opacity-40"
+                  />
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   <Link

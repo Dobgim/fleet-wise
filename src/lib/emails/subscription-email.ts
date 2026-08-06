@@ -30,7 +30,7 @@ export function buildSubscriptionEmail(params: {
   const perks = [
     cfg.perVehicle
       ? `${FREE_VEHICLES + qty} vehicles — the first ${FREE_VEHICLES} free, ${qty} at $${cfg.price} each`
-      : `Up to ${BUSINESS_VEHICLES} vehicles`,
+      : `Up to ${PLANS[plan].vehicles} vehicles`,
     "AI predictive maintenance across your whole fleet",
     "Maintenance reminders a week and three days before each service",
     "No contract — change or cancel any time",

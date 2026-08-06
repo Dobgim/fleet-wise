@@ -45,6 +45,7 @@ export async function POST() {
     model: v.model,
     mileage: Number(v.mileage),
     createdAt: v.created_at,
+    remindersEnabled: v.reminders_enabled ?? true,
   }));
   const records: ServiceRecord[] = (recordRows ?? []).map((r) => ({
     id: r.id,

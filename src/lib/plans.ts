@@ -1,14 +1,20 @@
 import type { EffectivePlan, PlanId } from "./types";
 
 /** Plans that can be bought. "free" is the default and costs nothing. */
-export type PaidPlanId = Extract<PlanId, "pro" | "business">;
+export type PaidPlanId = Extract<PlanId, "pro" | "business" | "yearly">;
 
 export interface PlanConfig {
   id: PaidPlanId;
   name: string;
-  /** Dollars. Per billable vehicle per month when `perVehicle`, else flat. */
+  /** Dollars. Per billable vehicle when `perVehicle`, else flat per period. */
   price: number;
   perVehicle: boolean;
+  /** Billing period in days. Whop takes days, not a period name. */
+  billingDays: number;
+  /** "month" | "year" — what the price is quoted per. */
+  per: "month" | "year";
+  /** Vehicles included. null means it is priced per vehicle instead. */
+  vehicles: number | null;
   blurb: string;
   features: string[];
 }
@@ -36,6 +42,9 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
     name: "Premium",
     price: 5,
     perVehicle: true,
+    billingDays: 30,
+    per: "month",
+    vehicles: null,
     blurb: "Grow past two vehicles. Pay only for the extras.",
     features: [
       `First ${FREE_VEHICLES} vehicles free, then $5 per vehicle per month`,
@@ -47,27 +56,49 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
   business: {
     id: "business",
     name: "Business",
-    price: 20,
+    price: 18,
     perVehicle: false,
+    billingDays: 30,
+    per: "month",
+    vehicles: 20,
     blurb: "Flat rate for larger fleets.",
     features: [
       "Up to 20 vehicles, one price",
+      "5 photo scans a day",
       "AI predictive maintenance across your whole fleet",
       "Priority support",
       "No contract, cancel anytime",
     ],
   },
+  yearly: {
+    id: "yearly",
+    name: "Business Yearly",
+    price: 199,
+    perVehicle: false,
+    billingDays: 365,
+    per: "year",
+    vehicles: 50,
+    blurb: "Pay once a year. More vehicles, more scans, less admin.",
+    features: [
+      "Up to 50 vehicles, one price",
+      "10 photo scans a day",
+      "AI predictive maintenance across your whole fleet",
+      "Priority support",
+      "Cancel anytime — no auto-renew surprises",
+    ],
+  },
 };
 
 /**
- * Vehicles included on Business. A stated cap rather than "unlimited": a
- * flat $20 covering a 300-vehicle fleet costs real money in AI calls and
+ * Vehicles included on the flat plans. Stated caps rather than "unlimited":
+ * a flat fee covering a 300-vehicle fleet costs real money in AI calls and
  * reminder emails while paying the same as a fleet of six. Must match
- * `vehicle_limit_for_org()` in migration 0019.
+ * `vehicle_limit_for_org()` in migration 0020.
  */
 export const BUSINESS_VEHICLES = 20;
+export const YEARLY_VEHICLES = 50;
 
-export const PLAN_ORDER: PaidPlanId[] = ["pro", "business"];
+export const PLAN_ORDER: PaidPlanId[] = ["pro", "business", "yearly"];
 
 /**
  * Photo scans allowed per day, by plan.
@@ -81,6 +112,7 @@ export const SCAN_LIMITS: Record<EffectivePlan, number> = {
   free: 0,
   pro: 3,
   business: 5,
+  yearly: 10,
 };
 
 /** Vehicles actually charged for: everything past the free allowance. */
@@ -108,9 +140,10 @@ export function isCheaperOnBusiness(vehicles: number): boolean {
   );
 }
 
-/** True when a fleet is too large for Business to cover. */
-export function exceedsBusiness(vehicles: number): boolean {
-  return vehicles > BUSINESS_VEHICLES;
+/** True when a fleet is too large for a given flat plan to cover. */
+export function exceedsPlan(id: PaidPlanId, vehicles: number): boolean {
+  const cap = PLANS[id].vehicles;
+  return cap !== null && vehicles > cap;
 }
 
 /** Human label for whatever the org is entitled to right now. */
@@ -120,6 +153,8 @@ export function planLabel(plan: EffectivePlan): string {
       return PLANS.pro.name;
     case "business":
       return PLANS.business.name;
+    case "yearly":
+      return PLANS.yearly.name;
     default:
       return "Free";
   }

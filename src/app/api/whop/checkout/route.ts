@@ -10,7 +10,6 @@ import {
 } from "@/lib/plans";
 import {
   createCheckoutSession,
-  whopConfigured,
   whopEnvironment,
   whopMissingConfig,
 } from "@/lib/whop";
@@ -26,7 +25,7 @@ import {
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  plan: z.enum(["pro", "business"]),
+  plan: z.enum(["pro", "business", "yearly"]),
   // Total fleet size the customer wants covered, not the billable count.
   fleet: z.number().int().min(1).max(1000),
 });
@@ -45,10 +44,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!whopConfigured()) {
+  const plan = parsed.data.plan as PaidPlanId;
+
+  if (whopMissingConfig(plan).length > 0) {
     return NextResponse.json(
       {
-        error: `Checkout isn't configured yet — missing ${whopMissingConfig().join(" and ")}.`,
+        error: `Checkout isn't configured yet — missing ${whopMissingConfig(plan).join(" and ")}.`,
       },
       { status: 503 }
     );
@@ -73,7 +74,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const plan = parsed.data.plan as PaidPlanId;
   const price = monthlyCost(plan, parsed.data.fleet);
 
   // A per-vehicle plan priced at zero would be a free subscription that still

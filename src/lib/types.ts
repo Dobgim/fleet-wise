@@ -17,6 +17,8 @@ export interface Vehicle {
   model: string;
   mileage: number;
   createdAt: string; // ISO
+  /** Whether the owner wants maintenance reminders for this vehicle. */
+  remindersEnabled: boolean;
 }
 
 export interface ServiceRecord {
@@ -34,13 +36,13 @@ export interface ServiceRecord {
  * it means "not subscribed", which during the trial window still grants
  * Premium-level access.
  */
-export type PlanId = "free" | "pro" | "business";
+export type PlanId = "free" | "pro" | "business" | "yearly";
 
 /**
  * What the organization is entitled to right now, decided by Postgres in
  * `effective_plan()`. This — not PlanId — is what the UI should reason about.
  */
-export type EffectivePlan = "free" | "pro" | "business";
+export type EffectivePlan = "free" | "pro" | "business" | "yearly";
 
 /** Today's AI token budget for an organization, as reported by Postgres. */
 export interface AiBudget {

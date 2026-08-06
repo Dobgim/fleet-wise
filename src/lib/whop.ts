@@ -1,4 +1,4 @@
-import type { PaidPlanId } from "./plans";
+import { PLANS, type PaidPlanId } from "./plans";
 
 /**
  * Server-side Whop billing. Whop is the merchant of record: it is the legal
@@ -29,13 +29,28 @@ export function whopConfigured(): boolean {
 }
 
 /** What is missing, named exactly — a generic "not configured" costs hours. */
-export function whopMissingConfig(): string[] {
+export function whopMissingConfig(plan?: PaidPlanId): string[] {
   const missing: string[] = [];
   if (!process.env.WHOP_API_KEY) missing.push("WHOP_API_KEY");
   if (!process.env.WHOP_COMPANY_ID) missing.push("WHOP_COMPANY_ID");
   // Not optional: a renewal plan cannot be created without a product.
-  if (!process.env.WHOP_PRODUCT_ID) missing.push("WHOP_PRODUCT_ID");
+  if (plan && !productIdFor(plan)) missing.push(productEnvName(plan));
+  else if (!plan && !process.env.WHOP_PRODUCT_ID) missing.push("WHOP_PRODUCT_ID");
   return missing;
+}
+
+function productEnvName(plan: PaidPlanId): string {
+  return `WHOP_PRODUCT_ID_${plan.toUpperCase()}`;
+}
+
+/**
+ * Each plan is its own Whop product, so Premium, Business and Yearly appear
+ * as separate line items in the dashboard and on receipts rather than three
+ * prices sharing one name. WHOP_PRODUCT_ID stays as a fallback so an
+ * existing single-product setup keeps working.
+ */
+function productIdFor(plan: PaidPlanId): string | undefined {
+  return process.env[productEnvName(plan)] || process.env.WHOP_PRODUCT_ID;
 }
 
 async function whopFetch(
@@ -110,14 +125,14 @@ export async function createCheckoutSession(params: {
       plan_type: "renewal",
       // Days, not a period name. "monthly" is rejected as a missing
       // parameter rather than an invalid one, which is a confusing way to
-      // find out.
-      billing_period: 30,
+      // find out. 365 for the yearly plan.
+      billing_period: PLANS[params.plan].billingDays,
       renewal_price: params.monthlyPrice,
       currency: "usd",
       // Required for a renewal plan, and named product_id — not
       // access_pass_id, which Whop's own docs use for the same object and
       // which this endpoint rejects outright.
-      product_id: process.env.WHOP_PRODUCT_ID,
+      product_id: productIdFor(params.plan),
     },
     metadata: {
       org_id: params.orgId,
