@@ -61,6 +61,20 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
 
 export const PLAN_ORDER: PaidPlanId[] = ["pro", "business"];
 
+/**
+ * Photo scans allowed per day, by plan.
+ *
+ * Vision is the most expensive call the product makes — roughly five times a
+ * chat question — so it is the one AI feature that is paid-only. Must match
+ * `scan_limit_for_plan()` in migration 0018; Postgres enforces it, this is
+ * only what the interface says.
+ */
+export const SCAN_LIMITS: Record<EffectivePlan, number> = {
+  free: 0,
+  pro: 3,
+  business: 5,
+};
+
 /** Vehicles actually charged for: everything past the free allowance. */
 export function billableVehicles(total: number): number {
   return Math.max(0, total - FREE_VEHICLES);

@@ -77,6 +77,9 @@ function emptyBudget(limit = 0): AiBudget {
     vehicleLimit: FREE_VEHICLES,
     freeVehicles: FREE_VEHICLES,
     seats: null,
+    scanLimit: 0,
+    scansUsed: 0,
+    scansRemaining: 0,
   };
 }
 

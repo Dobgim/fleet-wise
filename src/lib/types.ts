@@ -58,6 +58,10 @@ export interface AiBudget {
   freeVehicles: number;
   /** Premium only: vehicles paid for, i.e. beyond the free allowance. */
   seats: number | null;
+  /** Photo scans allowed per day on this plan. 0 means the plan has none. */
+  scanLimit: number;
+  scansUsed: number;
+  scansRemaining: number;
 }
 
 export interface FleetData {

@@ -9,6 +9,7 @@ import {
   FREE_VEHICLES,
   monthlyCost,
   PLANS,
+  SCAN_LIMITS,
 } from "@/lib/plans";
 import { useFleet } from "@/lib/store";
 import type { Vehicle } from "@/lib/types";
@@ -60,6 +61,10 @@ export default function VehiclesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
+  // Shown instead of the file picker when the plan has no scans at all. The
+  // upgrade prompt IS the free-tier experience of this feature, so it has to
+  // explain what is behind the wall rather than just refuse.
+  const [scanUpsell, setScanUpsell] = useState(false);
   // A rejected scan has to be told apart from a successful one at a glance,
   // so the banner carries its tone rather than the page inferring it.
   const [scanNote, setScanNote] = useState<{
@@ -70,6 +75,11 @@ export default function VehiclesPage() {
 
   if (!ready)
     return <p className="p-8 text-sm text-[var(--text-muted)]">Loading…</p>;
+
+  // Postgres decides both of these; these copies only shape the button, and
+  // the server refuses independently if they are ever wrong.
+  const canScan = budget.scanLimit > 0;
+  const outOfScans = canScan && budget.scansRemaining <= 0;
 
   const startEdit = (v: Vehicle) => {
     setEditingId(v.id);
@@ -196,7 +206,13 @@ export default function VehiclesPage() {
         // the form, next to the button that was just pressed — not in the
         // validation line below every field, where it reads as a form error
         // and is a whole form away from what caused it.
-        if (data.error === "not_vehicle" || data.error === "unclear") {
+        if (data.error === "upgrade_required") {
+          setScanUpsell(true);
+        } else if (
+          data.error === "not_vehicle" ||
+          data.error === "unclear" ||
+          data.error === "scan_quota"
+        ) {
           setScanNote({ text: message, tone: "reject" });
         } else {
           setError(message);
@@ -315,8 +331,10 @@ export default function VehiclesPage() {
           {!editingId && (
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={scanning}
+              onClick={() =>
+                canScan ? fileRef.current?.click() : setScanUpsell(true)
+              }
+              disabled={scanning || outOfScans}
               className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               style={{ borderColor: "var(--brand)", color: "var(--brand)" }}
             >
@@ -324,7 +342,13 @@ export default function VehiclesPage() {
                 <path d="M3 7a2 2 0 012-2h1.2l.8-1.4A1 1 0 018 3h4a1 1 0 01.9.6L13.8 5H15a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.5"/>
                 <circle cx="10" cy="10.5" r="2.6" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
-              {scanning ? "Reading photo…" : "Scan a photo instead"}
+              {scanning
+                ? "Reading photo…"
+                : !canScan
+                  ? "Scan a photo — upgrade"
+                  : outOfScans
+                    ? "No scans left today"
+                    : `Scan a photo instead (${budget.scansRemaining} left)`}
             </button>
           )}
           <input
@@ -336,6 +360,50 @@ export default function VehiclesPage() {
             className="hidden"
           />
         </div>
+
+        {scanUpsell && (
+          <div
+            role="alert"
+            className="mb-3 rounded-lg border px-4 py-3 text-sm"
+            style={{
+              borderColor: "var(--brand)",
+              background: "var(--brand-soft)",
+            }}
+          >
+            <p className="font-semibold">
+              Photo scanning is part of the paid plans
+            </p>
+            <p className="mt-1 text-[var(--text-secondary)]">
+              Point your camera at a vehicle, its number plate, the VIN plate
+              or the odometer, and MotorWise fills this form in for you — no
+              typing, no hunting for where the VIN is stamped.
+            </p>
+            <ul className="mt-2 space-y-1 text-[var(--text-secondary)]">
+              <li>
+                <b>{PLANS.pro.name}</b> — {SCAN_LIMITS.pro} photos a day
+              </li>
+              <li>
+                <b>{PLANS.business.name}</b> — {SCAN_LIMITS.business} photos a
+                day
+              </li>
+            </ul>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Link
+                href="/pricing"
+                className="btn-brand rounded-md px-4 py-2 text-sm font-medium"
+              >
+                See plans
+              </Link>
+              <button
+                type="button"
+                onClick={() => setScanUpsell(false)}
+                className="text-sm text-[var(--text-secondary)] underline"
+              >
+                Not now — I&apos;ll type it in
+              </button>
+            </div>
+          </div>
+        )}
 
         {scanNote && (
           <div

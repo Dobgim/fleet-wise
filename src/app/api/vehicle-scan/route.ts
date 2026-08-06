@@ -144,6 +144,48 @@ export async function POST(request: Request) {
     );
   }
 
+  // Claim a scan BEFORE spending money on vision. Postgres decides: the
+  // browser is told what its allowance is, but is never asked.
+  const { data: claimData, error: claimError } =
+    await supabase.rpc("claim_scan");
+  if (claimError) {
+    if (claimError.message?.includes("Two-factor authentication required")) {
+      return NextResponse.json({ error: MFA_REQUIRED }, { status: 403 });
+    }
+    console.error("claim_scan failed", claimError.message);
+    return NextResponse.json(
+      { error: "Could not check your scan allowance" },
+      { status: 500 }
+    );
+  }
+
+  const claim = claimData as {
+    allowed: boolean;
+    reason?: string;
+    limit: number;
+    used: number;
+    remaining: number;
+    plan: string;
+    resets_at: string;
+  };
+
+  if (!claim.allowed) {
+    // Two different refusals needing two different actions: buy a plan, or
+    // wait. Collapsing them would send half the users to the wrong place.
+    const upgrade = claim.reason === "plan";
+    return NextResponse.json(
+      {
+        error: upgrade ? "upgrade_required" : "scan_quota",
+        message: upgrade
+          ? "Photo scanning is a paid feature. Premium reads 3 photos a day, Business 5 — upgrade to switch it on, or type the details in yourself."
+          : `You've used all ${claim.limit} photo scans on your plan today. They refill at midnight UTC, or you can type the details in yourself.`,
+        scans: claim,
+        budget,
+      },
+      { status: 402 }
+    );
+  }
+
   const res = await fetch(aiChatUrl(), {
     method: "POST",
     headers: aiHeaders(apiKey),
@@ -174,6 +216,8 @@ export async function POST(request: Request) {
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error("vision error", aiBaseUrl(), res.status, detail.slice(0, 400));
+    // Someone else's outage must not cost a scan from an allowance of three.
+    await supabase.rpc("release_scan");
     return NextResponse.json(
       {
         error: "unavailable",
@@ -199,6 +243,9 @@ export async function POST(request: Request) {
   try {
     fields = JSON.parse(json.choices?.[0]?.message?.content ?? "{}");
   } catch {
+    // The model answered but not in JSON: our fault or the model's, not the
+    // user's, so the scan goes back.
+    await supabase.rpc("release_scan");
     return NextResponse.json(
       {
         error: "unreadable",
@@ -247,6 +294,8 @@ export async function POST(request: Request) {
   const vin = str(fields.vin, 17);
 
   return NextResponse.json({
+    scansRemaining: claim.remaining,
+    scanLimit: claim.limit,
     imageType,
     registration: str(fields.registration, 20)?.toUpperCase() ?? null,
     make: str(fields.make, 40),
