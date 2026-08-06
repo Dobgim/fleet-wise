@@ -1,6 +1,69 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { emailConfigured, sendEmail } from "@/lib/email";
+import { buildWelcomeEmail } from "@/lib/emails/welcome-email";
+import { SUPPORT_EMAIL } from "@/lib/company";
+
+type Admin = ReturnType<typeof createAdminClient>;
+
+/**
+ * Sends the welcome email exactly once per user.
+ *
+ * The claim comes first and the send second. Getting that order right is the
+ * whole point: claiming after sending would let a retry that arrives mid-send
+ * mail the user twice, whereas claiming first means a crash between the two
+ * loses one email rather than duplicating it. For a welcome message that is
+ * the better failure.
+ */
+async function sendWelcomeEmail(
+  admin: Admin,
+  userId: string,
+  email: string,
+  firstName: string | null
+): Promise<void> {
+  if (!emailConfigured()) return;
+
+  // Atomic claim: only the delivery that actually flips NULL -> now() gets a
+  // row back, so only it sends.
+  const { data: claimed, error: claimError } = await admin
+    .from("profiles")
+    .update({ welcome_email_sent_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("welcome_email_sent_at", null)
+    .select("user_id");
+
+  if (claimError) throw claimError;
+  if (!claimed?.length) return; // already sent, or another delivery won
+
+  const { data: config } = await admin
+    .from("app_config")
+    .select("beta_mode, beta_vehicle_limit")
+    .maybeSingle();
+  const beta = config?.beta_mode ?? false;
+  const freeVehicles = beta ? (config?.beta_vehicle_limit ?? 1) : 2;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://motorwise.co";
+  const { subject, html } = buildWelcomeEmail({
+    firstName,
+    freeVehicles,
+    beta,
+    siteUrl,
+    logoUrl: `${siteUrl}/logo.png`,
+    supportEmail: SUPPORT_EMAIL,
+  });
+
+  const result = await sendEmail({ to: email, subject, html });
+  if (!result.ok) {
+    // Release the claim so Clerk's retry can try again — a welcome email that
+    // failed on a transient Resend error should not be lost forever.
+    await admin
+      .from("profiles")
+      .update({ welcome_email_sent_at: null })
+      .eq("user_id", userId);
+    throw new Error(result.error);
+  }
+}
 
 /**
  * Keeps `public.profiles` in step with Clerk.
@@ -43,10 +106,12 @@ export async function POST(request: NextRequest) {
         const primary = u.email_addresses?.find(
           (e) => e.id === u.primary_email_address_id
         );
+        const email =
+          primary?.email_address ?? u.email_addresses?.[0]?.email_address ?? null;
         const { error } = await admin.from("profiles").upsert(
           {
             user_id: u.id,
-            email: primary?.email_address ?? u.email_addresses?.[0]?.email_address ?? null,
+            email,
             full_name:
               [u.first_name, u.last_name].filter(Boolean).join(" ") || null,
             mfa_enabled: Boolean(u.two_factor_enabled),
@@ -55,6 +120,13 @@ export async function POST(request: NextRequest) {
           { onConflict: "user_id" }
         );
         if (error) throw error;
+
+        // Only on creation. user.updated fires on every profile change, and
+        // the claim marker alone would not stop a welcome email going out to
+        // an existing user who simply turned on 2FA.
+        if (event.type === "user.created" && email) {
+          await sendWelcomeEmail(admin, u.id, email, u.first_name ?? null);
+        }
         break;
       }
 
