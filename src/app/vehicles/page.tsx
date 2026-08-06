@@ -53,7 +53,12 @@ export default function VehiclesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
-  const [scanNote, setScanNote] = useState("");
+  // A rejected scan has to be told apart from a successful one at a glance,
+  // so the banner carries its tone rather than the page inferring it.
+  const [scanNote, setScanNote] = useState<{
+    text: string;
+    tone: "info" | "reject";
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!ready)
@@ -173,7 +178,7 @@ export default function VehiclesPage() {
     e.target.value = ""; // allow re-picking the same file
     if (!file) return;
     setError("");
-    setScanNote("");
+    setScanNote(null);
     setScanning(true);
     try {
       const image = await fileToScaledDataUrl(file);
@@ -185,10 +190,18 @@ export default function VehiclesPage() {
       const data = await res.json().catch(() => ({}));
       if (data.budget) applyBudget(data.budget);
       if (!res.ok) {
-        setError(
+        const message =
           data.message ??
-            "Couldn't read that photo. Please fill the form in yourself."
-        );
+          "Couldn't read that photo. Please fill the form in yourself.";
+        // A photo the app refused belongs in the scan banner at the top of
+        // the form, next to the button that was just pressed — not in the
+        // validation line below every field, where it reads as a form error
+        // and is a whole form away from what caused it.
+        if (data.error === "not_vehicle" || data.error === "unclear") {
+          setScanNote({ text: message, tone: "reject" });
+        } else {
+          setError(message);
+        }
         return;
       }
       // Pre-fill only the fields the AI actually found; keep anything the user
@@ -203,12 +216,16 @@ export default function VehiclesPage() {
       const found = ["registration", "make", "model", "vin", "mileage"].filter(
         (k) => data[k] != null && data[k] !== ""
       );
-      setScanNote(
-        (data.notes ? data.notes + " " : "") +
+      setScanNote({
+        text:
+          (data.notes ? data.notes + " " : "") +
           (found.length
             ? `Filled in: ${found.join(", ")}. Please check each field, then Add vehicle.`
-            : "I couldn't read any details — please fill the form in yourself.")
-      );
+            : "I couldn't read any details — please fill the form in yourself."),
+        // Nothing readable is a soft failure, not a refusal: it was a vehicle,
+        // it just wasn't legible.
+        tone: found.length ? "info" : "reject",
+      });
     } catch {
       setError("Couldn't process that image. Try a clearer, smaller photo.");
     } finally {
@@ -329,13 +346,39 @@ export default function VehiclesPage() {
 
         {scanNote && (
           <div
-            className="mb-3 rounded-lg border px-3 py-2.5 text-sm"
-            style={{
-              borderColor: "var(--brand)",
-              background: "var(--brand-soft)",
-            }}
+            // assertive: a refused photo must be announced the moment it comes
+            // back, not when the screen reader next happens to reach it.
+            role={scanNote.tone === "reject" ? "alert" : "status"}
+            aria-live={scanNote.tone === "reject" ? "assertive" : "polite"}
+            className="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm"
+            style={
+              scanNote.tone === "reject"
+                ? {
+                    borderColor: "var(--status-critical)",
+                    background: "var(--status-critical-soft)",
+                    color: "var(--status-critical)",
+                  }
+                : {
+                    borderColor: "var(--brand)",
+                    background: "var(--brand-soft)",
+                  }
+            }
           >
-            {scanNote}
+            {scanNote.tone === "reject" && (
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                fill="none"
+                className="mt-0.5 shrink-0"
+              >
+                <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M10 6v4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="10" cy="13.6" r="0.9" fill="currentColor" />
+              </svg>
+            )}
+            <span>{scanNote.text}</span>
           </div>
         )}
 

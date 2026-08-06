@@ -33,12 +33,14 @@ const bodySchema = z.object({
     ),
 });
 
-const SYSTEM_PROMPT = `You read vehicle details from photographs for a fleet maintenance app.
+const SYSTEM_PROMPT = `You read vehicle details from photographs for a vehicle maintenance app.
 
-The photo may show: the outside of a vehicle, a number plate, a registration/insurance document, a VIN plate or door sticker, or an odometer.
+FIRST decide what the photo actually shows, then extract. Classification comes first and is the most important part of your answer — a wrong extraction wastes a user's time, but a wrong classification makes the app look broken.
 
 Return ONLY a JSON object with these keys:
 {
+  "image_type": "vehicle" | "plate" | "document" | "vin_plate" | "odometer" | "unclear" | "not_vehicle",
+  "subject": string,            // 1-4 words naming what is actually in the photo, e.g. "a dog", "a laptop", "a hand", "a Toyota Hilux"
   "registration": string|null,  // number plate / licence plate, uppercase, keep hyphens as shown
   "make": string|null,          // manufacturer, e.g. "Toyota"
   "model": string|null,         // e.g. "Hilux"
@@ -47,11 +49,32 @@ Return ONLY a JSON object with these keys:
   "notes": string               // one short sentence to the user: what you saw, and what they should check or photograph next
 }
 
-Rules:
+Choosing image_type:
+- "vehicle"    — a real road-going motor vehicle: car, van, truck, bus, motorcycle, tractor, trailer.
+- "plate"      — a number plate, close up.
+- "document"   — a registration, insurance or logbook document for a vehicle.
+- "vin_plate"  — a VIN stamped plate or door-jamb sticker.
+- "odometer"   — a dashboard or odometer reading.
+- "unclear"    — it may well be a vehicle or vehicle document, but it is too blurry, dark, angled or cropped to read anything from.
+- "not_vehicle" — anything else at all.
+
+Be strict. Use "not_vehicle" for people, animals, food, furniture, screens, buildings, scenery, documents unrelated to a vehicle, toy or model cars, and drawings or cartoons of cars. A photo of a real car on a poster, screen or advert is still "not_vehicle" — it is not the user's vehicle. When you are genuinely torn between "not_vehicle" and anything else, choose "not_vehicle".
+
+When image_type is "not_vehicle" or "unclear", every other field MUST be null. Name what you actually saw in "subject" — the app shows it to the user, so it must be honest and specific.
+
+Extraction rules:
 - Read ONLY what is genuinely visible. Never guess a plate, VIN or mileage.
-- If you can identify the make and model from the car's appearance, do so, and say in notes that it was identified visually and should be confirmed.
-- If the image is not a vehicle or is unreadable, set every field to null and explain in notes.
+- If you can identify the make and model from the vehicle's appearance, do so, and say in notes that it was identified visually and should be confirmed.
 - Never invent a plausible-looking VIN or registration. A null is always better than a guess.`;
+
+/** The classifications we accept as a genuine attempt to scan a vehicle. */
+const VEHICLE_TYPES = new Set([
+  "vehicle",
+  "plate",
+  "document",
+  "vin_plate",
+  "odometer",
+]);
 
 export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -192,6 +215,32 @@ export async function POST(request: Request) {
     typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null"
       ? v.trim().slice(0, max)
       : null;
+
+  // Reject before extracting. The prompt already tells the model to null the
+  // fields when the photo is not a vehicle, but a model that ignores that
+  // instruction would otherwise pre-fill a form from a photo of someone's
+  // lunch — so the refusal is enforced here, not merely requested there.
+  const imageType = str(fields.image_type, 20)?.toLowerCase() ?? "";
+  const subject = str(fields.subject, 60);
+
+  if (!VEHICLE_TYPES.has(imageType)) {
+    const seen = subject ? `That looks like ${subject}` : "That doesn't look like a vehicle";
+    const message =
+      imageType === "unclear"
+        ? `${subject ? `I can see ${subject}, but it's` : "That photo is"} too blurry or dark to read. Try again in better light, holding steady and closer.`
+        : `${seen} — not a vehicle. Photograph the vehicle itself, its number plate, its VIN plate, the odometer, or the registration document.`;
+
+    return NextResponse.json(
+      {
+        error: imageType === "unclear" ? "unclear" : "not_vehicle",
+        message,
+        subject,
+        budget: updatedBudget ?? budget,
+      },
+      { status: 422 }
+    );
+  }
+
   const mileage =
     typeof fields.mileage === "number" && Number.isFinite(fields.mileage)
       ? Math.max(0, Math.round(fields.mileage))
@@ -199,6 +248,7 @@ export async function POST(request: Request) {
   const vin = str(fields.vin, 17);
 
   return NextResponse.json({
+    imageType,
     registration: str(fields.registration, 20)?.toUpperCase() ?? null,
     make: str(fields.make, 40),
     model: str(fields.model, 40),

@@ -15,6 +15,9 @@
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
+  /* Tinted background for a critical banner — the same role --brand-soft
+     plays for the accent. */
+  --status-critical-soft: #fdeeee;
 
   /* Brand — taken from the logo's blue-to-violet gradient.
      --brand is the accent; --brand-ink is text placed on top of it. */
@@ -49,6 +52,8 @@
     --brand-hover: #6ba3f5;
     --brand-soft: #16233a;
     --brand-ink: #0b0b0b;
+    --status-critical: #f07070;
+    --status-critical-soft: #2e1717;
   }
 }
 
