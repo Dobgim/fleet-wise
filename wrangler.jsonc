@@ -20,13 +20,12 @@
   // Worker unreachable.
   "workers_dev": true,
 
-  // The live site. Uncomment once the Vercel A records for motorwise.co and
-  // www are deleted — Cloudflare refuses to manage a hostname that already
-  // has externally managed DNS records. Removing these again is the rollback.
-  // "routes": [
-  //   { "pattern": "motorwise.co", "custom_domain": true },
-  //   { "pattern": "www.motorwise.co", "custom_domain": true }
-  // ],
+  // The live site. Cloudflare manages the DNS records and the certificate
+  // for these. Removing them and redeploying is the rollback.
+  "routes": [
+    { "pattern": "motorwise.co", "custom_domain": true },
+    { "pattern": "www.motorwise.co", "custom_domain": true }
+  ],
 
   // The nightly maintenance reminders. Replaces the Vercel cron in
   // vercel.json — 07:00 UTC daily, unchanged.
