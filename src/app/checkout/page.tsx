@@ -29,6 +29,11 @@ function Checkout() {
   const params = useSearchParams();
   const session = params.get("session");
   const plan = params.get("plan");
+  // Carried from the API response, not read from a NEXT_PUBLIC_ variable:
+  // the embed must target the same Whop that issued the session. It defaults
+  // to production, so a sandbox plan without this renders Whop's own 404
+  // page inside the payment box.
+  const environment = params.get("env") === "production" ? "production" : "sandbox";
 
   if (!session) {
     return (
@@ -57,10 +62,27 @@ function Checkout() {
         className="rounded-xl border border-neutral-200 bg-[var(--surface-1)] p-4 dark:border-neutral-800"
         data-whop-checkout-session={session}
         {...(plan && { "data-whop-checkout-plan-id": plan })}
+        data-whop-checkout-environment={environment}
         data-whop-checkout-theme="system"
+        // Whop redirects here itself once payment succeeds. The plan is
+        // granted asynchronously by the webhook, and /pricing polls for it.
+        data-whop-checkout-return-url="/pricing?checkout=success"
       >
         <p className="text-sm text-[var(--text-muted)]">Loading payment form…</p>
       </div>
+
+      {environment === "sandbox" && (
+        <p
+          className="rounded-lg border px-3 py-2 text-xs"
+          style={{
+            borderColor: "var(--brand)",
+            background: "var(--brand-soft)",
+          }}
+        >
+          <b>Sandbox mode</b> — no real money moves. Test card{" "}
+          <code>4242 4242 4242 4242</code>, any future expiry, any CVC.
+        </p>
+      )}
 
       <Link
         href="/pricing"

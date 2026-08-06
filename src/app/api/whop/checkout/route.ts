@@ -11,6 +11,7 @@ import {
 import {
   createCheckoutSession,
   whopConfigured,
+  whopEnvironment,
   whopMissingConfig,
 } from "@/lib/whop";
 
@@ -107,5 +108,10 @@ export async function POST(request: Request) {
     sessionId: result.session.sessionId,
     planId: result.session.planId,
     price,
+    // Sent back rather than read from a NEXT_PUBLIC_ twin so the embed can
+    // never target a different Whop than the one that created the session.
+    // That mismatch is invisible until checkout renders Whop's own 404 page
+    // inside the payment box.
+    environment: whopEnvironment(),
   });
 }

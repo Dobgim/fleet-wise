@@ -16,8 +16,12 @@ const SANDBOX_BASE = "https://sandbox-api.whop.com/api/v1";
 const PRODUCTION_BASE = "https://api.whop.com/api/v1";
 
 /** Sandbox unless explicitly told otherwise, so a mistake cannot take money. */
+export function whopEnvironment(): "production" | "sandbox" {
+  return process.env.WHOP_ENV === "production" ? "production" : "sandbox";
+}
+
 export function whopBase(): string {
-  return process.env.WHOP_ENV === "production" ? PRODUCTION_BASE : SANDBOX_BASE;
+  return whopEnvironment() === "production" ? PRODUCTION_BASE : SANDBOX_BASE;
 }
 
 export function whopConfigured(): boolean {

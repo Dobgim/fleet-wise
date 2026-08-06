@@ -119,6 +119,9 @@ export default function VehiclesPage() {
       }
       const query = new URLSearchParams({ session: data.sessionId });
       if (data.planId) query.set("plan", data.planId);
+      // The embed defaults to production; a sandbox session without this
+      // renders Whop's 404 page inside the payment box.
+      if (data.environment) query.set("env", data.environment);
       router.push(`/checkout?${query.toString()}`);
     } catch {
       setError("Couldn't start checkout. Nothing was charged.");
