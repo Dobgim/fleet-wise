@@ -52,7 +52,7 @@ export interface AiBudget {
   resets_at: string;
   /** Entitlement in force. */
   plan: EffectivePlan;
-  /** Total vehicles allowed; null = unlimited (Business). */
+  /** Total vehicles allowed. */
   vehicleLimit: number | null;
   /** Vehicles included at no charge on every plan. */
   freeVehicles: number;

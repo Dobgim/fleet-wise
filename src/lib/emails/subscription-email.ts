@@ -1,4 +1,9 @@
-import { FREE_VEHICLES, PLANS, type PaidPlanId } from "../plans";
+import {
+  BUSINESS_VEHICLES,
+  FREE_VEHICLES,
+  PLANS,
+  type PaidPlanId,
+} from "../plans";
 
 /**
  * Sent by us when a subscription becomes active.
@@ -25,7 +30,7 @@ export function buildSubscriptionEmail(params: {
   const perks = [
     cfg.perVehicle
       ? `${FREE_VEHICLES + qty} vehicles — the first ${FREE_VEHICLES} free, ${qty} at $${cfg.price} each`
-      : "Unlimited vehicles",
+      : `Up to ${BUSINESS_VEHICLES} vehicles`,
     "AI predictive maintenance across your whole fleet",
     "Maintenance reminders a week and three days before each service",
     "No contract — change or cancel any time",

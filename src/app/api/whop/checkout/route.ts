@@ -91,7 +91,8 @@ export async function POST(request: Request) {
   const result = await createCheckoutSession({
     plan,
     monthlyPrice: price,
-    // Business is unlimited, so it has no seat count to enforce.
+    // Business is a flat price with a fixed cap, so it has no per-vehicle
+    // seat count; its limit comes from the plan, not from what was bought.
     seats: PLANS[plan].perVehicle
       ? Math.max(1, billableVehicles(parsed.data.fleet))
       : null,

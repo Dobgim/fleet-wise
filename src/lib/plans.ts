@@ -51,13 +51,21 @@ export const PLANS: Record<PaidPlanId, PlanConfig> = {
     perVehicle: false,
     blurb: "Flat rate for larger fleets.",
     features: [
-      "Unlimited vehicles, one price",
+      "Up to 20 vehicles, one price",
       "AI predictive maintenance across your whole fleet",
       "Priority support",
       "No contract, cancel anytime",
     ],
   },
 };
+
+/**
+ * Vehicles included on Business. A stated cap rather than "unlimited": a
+ * flat $20 covering a 300-vehicle fleet costs real money in AI calls and
+ * reminder emails while paying the same as a fleet of six. Must match
+ * `vehicle_limit_for_org()` in migration 0019.
+ */
+export const BUSINESS_VEHICLES = 20;
 
 export const PLAN_ORDER: PaidPlanId[] = ["pro", "business"];
 
@@ -91,7 +99,18 @@ export const BUSINESS_BREAK_EVEN =
   FREE_VEHICLES + Math.ceil(PLANS.business.price / PLANS.pro.price);
 
 export function isCheaperOnBusiness(vehicles: number): boolean {
-  return monthlyCost("pro", vehicles) > PLANS.business.price;
+  // Cheaper is not the same as available: past the cap, Business cannot hold
+  // the fleet at all, and recommending it there would send someone to a plan
+  // that refuses their 21st vehicle.
+  return (
+    vehicles <= BUSINESS_VEHICLES &&
+    monthlyCost("pro", vehicles) > PLANS.business.price
+  );
+}
+
+/** True when a fleet is too large for Business to cover. */
+export function exceedsBusiness(vehicles: number): boolean {
+  return vehicles > BUSINESS_VEHICLES;
 }
 
 /** Human label for whatever the org is entitled to right now. */

@@ -7,6 +7,8 @@ import { useFleet } from "@/lib/store";
 import {
   billableVehicles,
   BUSINESS_BREAK_EVEN,
+  BUSINESS_VEHICLES,
+  exceedsBusiness,
   FREE_VEHICLES,
   isCheaperOnBusiness,
   monthlyCost,
@@ -258,7 +260,8 @@ function Pricing() {
         {isCheaperOnBusiness(fleet) && (
           <p className="mt-3 text-sm text-[var(--text-secondary)]">
             At {fleet} vehicles, <b>Business works out cheaper</b> — $
-            {PLANS.business.price}/month flat, unlimited.
+            {PLANS.business.price}/month flat, up to {BUSINESS_VEHICLES}{" "}
+            vehicles.
           </p>
         )}
       </section>
@@ -299,13 +302,22 @@ function Pricing() {
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
                 {p.perVehicle
                   ? `${fleet} vehicles → $${cost}/month`
-                  : `Unlimited vehicles → $${cost}/month`}
+                  : `Up to ${BUSINESS_VEHICLES} vehicles → $${cost}/month`}
               </p>
-              {!p.perVehicle && (
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Better value from {BUSINESS_BREAK_EVEN} vehicles up.
-                </p>
-              )}
+              {!p.perVehicle &&
+                (exceedsBusiness(fleet) ? (
+                  <p
+                    className="mt-1 text-xs"
+                    style={{ color: "var(--status-critical)" }}
+                  >
+                    Business covers {BUSINESS_VEHICLES} vehicles — {fleet} is
+                    too many. Talk to us and we&apos;ll sort something out.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Better value from {BUSINESS_BREAK_EVEN} vehicles up.
+                  </p>
+                ))}
 
               <ul className="mt-4 flex-1 space-y-2 text-sm">
                 {p.features.map((f) => (
@@ -318,7 +330,9 @@ function Pricing() {
 
               {signedIn ? (
                 <button
-                  disabled={busy !== null}
+                  disabled={
+                    busy !== null || (!p.perVehicle && exceedsBusiness(fleet))
+                  }
                   onClick={() => choose(id)}
                   className="btn-brand mt-5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
