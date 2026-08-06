@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { MFA_REQUIRED } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
+import { aiBaseUrl, aiChatUrl, aiHeaders, describeAiFailure } from "@/lib/ai";
 
 /**
  * LLM-backed copilot endpoint.
@@ -137,12 +138,9 @@ export async function POST(request: Request) {
   // cap the answer length to what is actually left (600 tokens at most).
   const replyCap = Math.max(120, Math.min(600, budget.remaining - 200));
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch(aiChatUrl(), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: aiHeaders(apiKey),
     body: JSON.stringify({
       model,
       temperature: 0.3,
@@ -162,10 +160,15 @@ export async function POST(request: Request) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    console.error("OpenAI error", res.status, detail.slice(0, 500));
+    console.error("AI provider error", aiBaseUrl(), res.status, detail.slice(0, 500));
     // Failed calls are not charged to the user.
     return NextResponse.json(
-      { error: `LLM request failed (${res.status})`, budget },
+      {
+        error:
+          describeAiFailure(res.status, detail) ||
+          `The AI provider refused the request (${res.status}).`,
+        budget,
+      },
       { status: 502 }
     );
   }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { MFA_REQUIRED } from "@/lib/mfa";
 import { createClient } from "@/lib/supabase/server";
+import { aiBaseUrl, aiChatUrl, aiHeaders, describeAiFailure } from "@/lib/ai";
 
 /**
  * Read a vehicle's details from a photo.
@@ -143,12 +144,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch(aiChatUrl(), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: aiHeaders(apiKey),
     body: JSON.stringify({
       model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
       temperature: 0,
@@ -175,11 +173,12 @@ export async function POST(request: Request) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    console.error("vision error", res.status, detail.slice(0, 400));
+    console.error("vision error", aiBaseUrl(), res.status, detail.slice(0, 400));
     return NextResponse.json(
       {
         error: "unavailable",
         message:
+          describeAiFailure(res.status, detail) ||
           "Couldn't read the photo right now. Please fill the form in manually.",
       },
       { status: 502 }
