@@ -36,11 +36,28 @@ jobs:
           node-version: 22
           cache: npm
 
-      # ci, not install: installs exactly what package-lock.json pins, so a
-      # deploy cannot silently pick up a different dependency than the one
-      # tested locally.
+      # `npm ci` first, because it installs exactly what package-lock.json
+      # pins and cannot silently pick up a different dependency than the one
+      # tested locally. That is the guarantee worth having.
+      #
+      # It falls back to `npm install` for one specific reason: the lockfile
+      # is generated on Windows, and npm only records the nested dependencies
+      # of optional platform packages it actually installed. The Linux/WASM
+      # variants that CI needs (@emnapi/*, via @tailwindcss/oxide and
+      # @unrs/resolver) resolve to different versions there, so `npm ci`
+      # refuses a lockfile that is perfectly valid on the machine that wrote
+      # it. Failing the deploy over that would be theatre.
+      #
+      # The fallback is loud on purpose: if it fires, reproducibility is
+      # reduced for that run and the log says so.
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if npm ci; then
+            echo "npm ci succeeded — exact locked versions installed"
+          else
+            echo "::warning::npm ci failed (lockfile/platform mismatch); falling back to npm install"
+            npm install --no-audit --no-fund
+          fi
 
       - name: Type check
         run: npx tsc --noEmit
