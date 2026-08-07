@@ -216,35 +216,30 @@ export function FleetProvider({ children }: { children: ReactNode }) {
 
       let org = membership?.org_id as string | undefined;
       if (!org) {
-        // First sign-in: create the organization + owner membership.
+        // First sign-in: create the organization + owner membership in one
+        // atomic, server-side step. This used to be two client inserts, but
+        // the membership insert relied on an RLS policy that also let a user
+        // insert themselves into any OTHER org — so bootstrap_org() (SECURITY
+        // DEFINER, caller-only) is now the single creation path.
         const email = user.primaryEmailAddress?.emailAddress;
         const name =
           (user.unsafeMetadata?.company_name as string | undefined)?.trim() ||
           `${email?.split("@")[0] ?? "My"}'s garage`;
-        const newOrgId = crypto.randomUUID();
-        const { error: orgErr } = await supabase
-          .from("organizations")
-          .insert({ id: newOrgId, name });
-        if (orgErr) {
-          console.error("org create failed", orgErr);
+        const { data: newOrgId, error: bootErr } = await supabase.rpc(
+          "bootstrap_org",
+          { p_name: name }
+        );
+        if (bootErr || !newOrgId) {
+          console.error("workspace bootstrap failed", bootErr);
           if (!cancelled) {
-            setOrgError(`Could not create your workspace: ${orgErr.message}`);
+            setOrgError(
+              `Could not set up your workspace: ${bootErr?.message ?? "unknown error"}`
+            );
             setReady(true);
           }
           return;
         }
-        const { error: memErr } = await supabase
-          .from("memberships")
-          .insert({ org_id: newOrgId, user_id: user.id, role: "owner" });
-        if (memErr) {
-          console.error("membership create failed", memErr);
-          if (!cancelled) {
-            setOrgError(`Could not set up your workspace: ${memErr.message}`);
-            setReady(true);
-          }
-          return;
-        }
-        org = newOrgId;
+        org = newOrgId as string;
       }
 
       const { data: orgRow } = await supabase
