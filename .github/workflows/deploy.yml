@@ -1,0 +1,80 @@
+name: Deploy to Cloudflare Workers
+
+# Push to main deploys the site. Cloudflare has no git integration set up
+# here — before this workflow existed, a push changed GitHub and nothing else,
+# and the live site only moved when someone ran wrangler by hand.
+on:
+  push:
+    branches: [main]
+  # Lets you re-run a deploy from the Actions tab without an empty commit.
+  workflow_dispatch:
+
+# One deploy at a time. Two overlapping runs would race to upload the same
+# Worker, and the loser could overwrite the newer build.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Only the two that OpenNext/wrangler read from the environment are set
+    # job-wide; the NEXT_PUBLIC_* values are set on the build step, because
+    # they are compiled into the browser bundle and are needed there and only
+    # there.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ci, not install: installs exactly what package-lock.json pins, so a
+      # deploy cannot silently pick up a different dependency than the one
+      # tested locally.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # Anything NEXT_PUBLIC_ is baked in at build time and is public by
+      # definition — it ships inside the JavaScript every visitor downloads.
+      # Server secrets (Supabase service role, Clerk secret, Whop, OpenAI,
+      # Resend) are NOT here: they live as Worker secrets set by
+      # `wrangler secret put`, and `wrangler deploy` leaves them untouched.
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SITE_URL: https://motorwise.co
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /login
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /signup
+          NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: /dashboard
+          NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: /dashboard
+        run: npx opennextjs-cloudflare build
+
+      - name: Deploy
+        run: npx wrangler deploy
+
+      # A deploy that returns success while the site 500s is worse than a
+      # failed one, because nobody looks. Fail the run instead.
+      - name: Smoke test
+        run: |
+          set -e
+          for path in / /pricing /login; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://motorwise.co$path")
+            echo "$path -> $code"
+            if [ "$code" != "200" ]; then
+              echo "::error::motorwise.co$path returned $code after deploy"
+              exit 1
+            fi
+          done
