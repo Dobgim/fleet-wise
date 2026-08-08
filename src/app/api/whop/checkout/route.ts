@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   billableVehicles,
   monthlyCost,
@@ -87,15 +88,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // Business and Yearly are flat prices with a fixed cap, so they have no
+  // per-vehicle seat count; their limit comes from the plan, not from what was
+  // bought. Hoisted out of the call because the whop_checkouts row below has
+  // to store the same number.
+  const seats = PLANS[plan].perVehicle
+    ? Math.max(1, billableVehicles(parsed.data.fleet))
+    : null;
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://motorwise.co";
   const result = await createCheckoutSession({
     plan,
     monthlyPrice: price,
-    // Business is a flat price with a fixed cap, so it has no per-vehicle
-    // seat count; its limit comes from the plan, not from what was bought.
-    seats: PLANS[plan].perVehicle
-      ? Math.max(1, billableVehicles(parsed.data.fleet))
-      : null,
+    seats,
     orgId: org.id,
     redirectUrl: `${siteUrl}/pricing?checkout=success`,
   });
@@ -105,9 +110,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: 502 });
   }
 
+  // Record what this session is for BEFORE handing it to the browser. Whop
+  // drops the metadata we send it (see migration 0023), so this row is the
+  // only thing that will tell the webhook whose garage to upgrade.
+  //
+  // A failure here is fatal to the checkout on purpose. The alternative is
+  // letting someone pay for a session that can never be attributed — money
+  // taken, plan never granted, and a refund to arrange by hand.
+  const { error: recordError } = await createAdminClient()
+    .from("whop_checkouts")
+    .upsert(
+      {
+        session_id: result.session.sessionId,
+        org_id: org.id,
+        plan,
+        seats,
+        price,
+      },
+      { onConflict: "session_id" }
+    );
+
+  if (recordError) {
+    console.error("could not record whop checkout", recordError);
+    return NextResponse.json(
+      {
+        error:
+          "We couldn't start checkout safely just now, so we've stopped before taking any payment. Please try again in a moment.",
+      },
+      { status: 500 }
+    );
+  }
+
   return NextResponse.json({
     sessionId: result.session.sessionId,
     planId: result.session.planId,
+    purchaseUrl: result.session.purchaseUrl,
     price,
     // Sent back rather than read from a NEXT_PUBLIC_ twin so the embed can
     // never target a different Whop than the one that created the session.

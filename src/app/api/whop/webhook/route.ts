@@ -106,6 +106,94 @@ function pick(obj: unknown, ...keys: string[]): unknown {
   return undefined;
 }
 
+function asPaidPlan(value: unknown): PlanId | null {
+  return value === "pro" || value === "business" || value === "yearly"
+    ? (value as PlanId)
+    : null;
+}
+
+interface Purchase {
+  orgId: string;
+  paidPlan: PlanId | null;
+  seats: number | null;
+}
+
+/**
+ * Work out which garage a membership belongs to, and what they bought.
+ *
+ * Three sources, in descending order of trust:
+ *
+ *   1. whop_checkouts, keyed by checkout_configuration_id. Written by our own
+ *      server when the session was created, so the plan and seat count are
+ *      what we decided to sell — not values that made a round trip through a
+ *      third party and could come back altered.
+ *
+ *   2. The subscriptions row for this membership id. Renewal and cancellation
+ *      events fire long after checkout and need not carry a checkout id at
+ *      all; this is how an existing customer's events stay attributable.
+ *
+ *   3. The event's own metadata. Whop currently drops what we send (see
+ *      migration 0023), so in practice this never fires — it is kept so the
+ *      flow starts working on its own if Whop fixes that, rather than
+ *      depending on anyone noticing.
+ */
+async function resolvePurchase(
+  admin: Admin,
+  data: unknown,
+  membershipId: string | null
+): Promise<Purchase | null> {
+  const checkoutId = pick(data, "checkout_configuration_id");
+  if (typeof checkoutId === "string" && checkoutId) {
+    const { data: row } = await admin
+      .from("whop_checkouts")
+      .select("org_id, plan, seats")
+      .eq("session_id", checkoutId)
+      .maybeSingle();
+    if (row?.org_id) {
+      return {
+        orgId: row.org_id,
+        paidPlan: asPaidPlan(row.plan),
+        seats: typeof row.seats === "number" ? row.seats : null,
+      };
+    }
+  }
+
+  if (membershipId) {
+    const { data: row } = await admin
+      .from("subscriptions")
+      .select("org_id, plan")
+      .eq("billing_subscription_id", membershipId)
+      .maybeSingle();
+    if (row?.org_id) {
+      // Seats are re-read from the org rather than this row, which does not
+      // carry them; a renewal must not silently reset a customer's allowance.
+      const { data: current } = await admin
+        .from("organizations")
+        .select("seats")
+        .eq("id", row.org_id)
+        .maybeSingle();
+      return {
+        orgId: row.org_id,
+        paidPlan: asPaidPlan(row.plan),
+        seats: typeof current?.seats === "number" ? current.seats : null,
+      };
+    }
+  }
+
+  const metadata = pick(data, "metadata") as Record<string, unknown> | undefined;
+  if (typeof metadata?.org_id === "string" && metadata.org_id) {
+    const seatsRaw = Number(metadata.seats);
+    return {
+      orgId: metadata.org_id,
+      paidPlan: asPaidPlan(metadata.plan),
+      seats:
+        Number.isFinite(seatsRaw) && seatsRaw > 0 ? Math.floor(seatsRaw) : null,
+    };
+  }
+
+  return null;
+}
+
 /**
  * Apply a membership to the garage that bought it.
  *
@@ -116,30 +204,24 @@ function pick(obj: unknown, ...keys: string[]): unknown {
 async function applyMembership(data: unknown, valid: boolean) {
   const admin = createAdminClient();
 
-  const metadata = pick(data, "metadata") as Record<string, unknown> | undefined;
-  const orgId = typeof metadata?.org_id === "string" ? metadata.org_id : null;
-  if (!orgId) {
-    // Without org_id we cannot attribute the payment. Log loudly rather than
+  const membershipId =
+    typeof pick(data, "id") === "string" ? (pick(data, "id") as string) : null;
+
+  const resolved = await resolvePurchase(admin, data, membershipId);
+  if (!resolved) {
+    // Nothing left to attribute the payment to. Log loudly rather than
     // silently upgrading the wrong account.
-    console.error("whop membership without org_id metadata", pick(data, "id"));
+    console.error(
+      "whop membership could not be attributed to an org",
+      membershipId,
+      pick(data, "checkout_configuration_id")
+    );
     return;
   }
 
-  const membershipId =
-    typeof pick(data, "id") === "string" ? (pick(data, "id") as string) : null;
-  const paidPlan =
-    metadata?.plan === "pro" ||
-    metadata?.plan === "business" ||
-    metadata?.plan === "yearly"
-      ? (metadata.plan as PlanId)
-      : null;
+  const { orgId, paidPlan } = resolved;
   const plan: PlanId = valid && paidPlan ? paidPlan : "free";
-
-  const seatsRaw = Number(metadata?.seats);
-  const seats =
-    plan === "pro" && Number.isFinite(seatsRaw) && seatsRaw > 0
-      ? Math.floor(seatsRaw)
-      : null;
+  const seats = plan === "pro" ? resolved.seats : null;
 
   // Read before writing, so the receipt email fires on a real upgrade only —
   // not on every renewal or status tick Whop sends.

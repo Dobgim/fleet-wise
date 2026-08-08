@@ -95,6 +95,13 @@ function whopError(json: Record<string, unknown>, status: number): string {
 export interface CheckoutSession {
   sessionId: string;
   planId: string | null;
+  /**
+   * Whop's own hosted checkout page for this session. The embed is the primary
+   * path, but it depends on a third-party script mounting into our DOM — when
+   * that fails it fails silently, leaving a customer staring at an empty box.
+   * This is the escape hatch, and it is the same session either way.
+   */
+  purchaseUrl: string | null;
 }
 
 /**
@@ -134,11 +141,16 @@ export async function createCheckoutSession(params: {
       // which this endpoint rejects outright.
       product_id: productIdFor(params.plan),
     },
+    // Still sent, but NOT relied on. Whop accepts this field, returns 200, and
+    // silently discards it — the create response and a later GET both show
+    // "metadata": null, while redirect_url from the same request persists.
+    // Verified against the live sandbox across three body shapes. The real
+    // attribution is the whop_checkouts row the caller writes against the
+    // returned session id; this stays only so the values show up in Whop's
+    // dashboard if they ever start honouring it.
     metadata: {
       org_id: params.orgId,
       plan: params.plan,
-      // Read back by the webhook as the vehicle allowance. Whop cannot derive
-      // it from the price, because the price is already multiplied out.
       seats: params.seats === null ? "" : String(params.seats),
     },
     redirect_url: params.redirectUrl,
@@ -168,6 +180,8 @@ export async function createCheckoutSession(params: {
     session: {
       sessionId,
       planId: typeof plan?.id === "string" ? plan.id : null,
+      purchaseUrl:
+        typeof json.purchase_url === "string" ? json.purchase_url : null,
     },
   };
 }

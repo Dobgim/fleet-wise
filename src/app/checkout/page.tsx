@@ -15,6 +15,26 @@ import { useSearchParams } from "next/navigation";
  */
 const LOADER = "https://js.whop.com/static/checkout/loader.js";
 
+/**
+ * Accept a URL only if it is HTTPS on whop.com or a subdomain of it.
+ *
+ * endsWith(".whop.com") alone would pass "evil-whop.com", and includes()
+ * would pass "whop.com.evil.net" — hence the explicit equality-or-dot-suffix
+ * test against the parsed hostname rather than a substring match on the
+ * string.
+ */
+function safeWhopUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    const isWhop = host === "whop.com" || host.endsWith(".whop.com");
+    return url.protocol === "https:" && isWhop ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CheckoutPage() {
   return (
     <Suspense
@@ -34,6 +54,11 @@ function Checkout() {
   // to production, so a sandbox plan without this renders Whop's own 404
   // page inside the payment box.
   const environment = params.get("env") === "production" ? "production" : "sandbox";
+  // Whop's hosted page for this same session. Only accepted if it really is a
+  // Whop URL — it arrives via the query string, so without this check a
+  // crafted link could point the "having trouble" button at a phishing page
+  // that looks like our checkout.
+  const purchaseUrl = safeWhopUrl(params.get("url"));
 
   if (!session) {
     return (
@@ -70,6 +95,23 @@ function Checkout() {
       >
         <p className="text-sm text-[var(--text-muted)]">Loading payment form…</p>
       </div>
+
+      {purchaseUrl && (
+        <p className="text-sm text-[var(--text-secondary)]">
+          Payment form not appearing?{" "}
+          <a
+            href={purchaseUrl}
+            className="font-medium underline"
+            // noopener/noreferrer because this opens a payment page: the new
+            // tab must not be able to reach back through window.opener.
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open checkout on Whop instead
+          </a>
+          .
+        </p>
+      )}
 
       {environment === "sandbox" && (
         <p

@@ -144,6 +144,9 @@ function Pricing() {
       // The embed defaults to production; a sandbox session without this
       // renders Whop's 404 page inside the payment box.
       if (data.environment) query.set("env", data.environment);
+      // Whop's own hosted page for the same session, offered on the checkout
+      // page if the embed does not appear.
+      if (data.purchaseUrl) query.set("url", data.purchaseUrl);
       router.push(`/checkout?${query.toString()}`);
     } catch {
       setError("Couldn't start checkout. Please try again.");
